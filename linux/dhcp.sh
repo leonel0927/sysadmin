@@ -6,21 +6,19 @@ verificador_ip(){
         IFS='.'
         partes=($ip)
         IFS=$OIFS
-        if [[ ${partes[0]} -le 255 && ${partes[1]} -le 255 && ${partes[2]} -le 255 && ${partes[3]} -le 255 ]]; then
-            return 0
-        fi 
+        for i in {0..3}; do
+            if [[ ${partes[$i]} -gt 255 ]]; then return 1; fi
+        done
+        local valor_ip=$(( (${partes[0]} << 24) + (${partes[1]} << 16) + (${partes[2]} << 8) + ${partes[3]} ))
+        local valor_minimo=$(( (1 << 24) + (0 << 16) + (0 << 8) + 1 ))
+        local valor_maximo=$(( (255 << 24) + (255 << 16) + (255 << 8) + 254 ))
+
+        if [[ $valor_ip -lt $valor_minimo || $valor_ip -gt $valor_maximo ]]; then
+            return 1
+        fi
+        return 0
     fi
     return 1
-}
-
-instalacion(){
-    echo "VERIFICANDO SI YA EXISTE EL SERVIDOR..."
-    if dpkg -l | grep -q isc-dhcp-server; then
-        echo "EL SERVIDOR YA EXISTE"
-    else
-        echo "INSTALANDO SERVIDOR DE FORMA DESATENDIDA..."
-        sudo apt-get update && sudo apt-get install -y isc-dhcp-server
-    fi
 }
 
 validador_rango(){
@@ -29,43 +27,61 @@ validador_rango(){
     IFS=. read -r p1 p2 p3 p4 <<< "$ip"
     echo $(( (p1 << 24) + (p2 << 16) + (p3 << 8) + p4 ))
 }
-echo "            CONFIGURACION DE SERVIDOR DHCP"
-instalacion
 
-read -p "NOMBRE DEL AMBITO: " scope
-while true; do
-    read -p "IP INICIAL: " rinicial
-    read -p "IP FINAL: " rfinal
-    if verificador_ip "$rinicial" && verificador_ip "$rfinal"; then
-        numinicial=$(validador_rango "$rinicial")
-        numfinal=$(validador_rango "$rfinal")
-        if [[ $numinicial -le $numfinal ]]; then
-            break
-        else
-            echo "LA IP INICIAL DEBE DE SER MENOR A LA FINAL"
-        fi
+instalacion(){
+    echo "VERIFICANDO SERVIDOR..."
+    if dpkg -l | grep -q isc-dhcp-server; then
+        echo "ESTADO: INSTALADO"
     else
-        echo "FORMATO DE IP INVALIDO"
+        echo "INSTALANDO SERVIDOR..."
+        sudo apt-get update && sudo apt-get install -y isc-dhcp-server
     fi
-done
-read -p "TIEMPO DE CONCESION (segundos): " tiempo
-while true; do
-    read -p "IP DNS: " dns
-    verificador_ip "$dns" && break || echo "DNS INVALIDO"
-done
-while true; do
-    read -p "IP PUERTA DE ENLACE: " ptenlace
-    verificador_ip "$ptenlace" && break || echo "PUERTA DE ENLACE INVALIDA"
-done
-red=$(echo $rinicial | cut -d. -f1-3).0
-ip_servidor=$rinicial
-export red rinicial rfinal ptenlace dns tiempo
-red=$(echo $rinicial | cut -d. -f1-3).0
-sudo ip addr flush dev enp0s8
-sudo ip addr add $ip_servidor/24 dev enp0s8
-sudo ip link set enp0s8 up
-echo "GENERANDO ARCHIVO DE CONFIGURACION..."
-sudo -E bash -c "cat > /etc/dhcp/dhcpd.conf <<EOF
+    sleep 2
+}
+
+configurar_dhcp(){
+    clear
+    echo "--- NUEVA CONFIGURACIÓN DE ÁMBITO ---"
+    read -p "NOMBRE DEL AMBITO: " scope
+    
+    while true; do
+        read -p "IP INICIAL: " rinicial
+        read -p "IP FINAL: " rfinal
+        if verificador_ip "$rinicial" && verificador_ip "$rfinal"; then
+            numinicial=$(validador_rango "$rinicial")
+            numfinal=$(validador_rango "$rfinal")
+            if [[ $numinicial -le $numfinal ]]; then
+                break
+            else
+                echo "ERROR: LA IP INICIAL DEBE SER MENOR A LA FINAL"
+            fi
+        else
+            echo "ERROR: FORMATO DE IP INVÁLIDO (1.0.0.1 - 255.255.255.254)"
+        fi
+    done
+
+    read -p "TIEMPO DE CONCESIÓN (segundos): " tiempo
+    
+    while true; do
+        read -p "IP DNS: " dns
+        verificador_ip "$dns" && break || echo "DNS INVÁLIDO"
+    done
+
+    while true; do
+        read -p "IP PUERTA DE ENLACE: " ptenlace
+        verificador_ip "$ptenlace" && break || echo "PUERTA DE ENLACE INVÁLIDA"
+    done
+
+    red=$(echo $rinicial | cut -d. -f1-3).0
+    ip_servidor=$rinicial 
+    
+    echo "CONFIGURANDO INTERFAZ enp0s8..."
+    sudo ip addr flush dev enp0s8
+    sudo ip addr add $ip_servidor/24 dev enp0s8
+    sudo ip link set enp0s8 up
+
+    echo "GENERANDO dhcpd.conf..."
+    sudo bash -c "cat > /etc/dhcp/dhcpd.conf <<EOF
 authoritative;
 subnet $red netmask 255.255.255.0 {
   range $rinicial $rfinal;
@@ -75,23 +91,58 @@ subnet $red netmask 255.255.255.0 {
   max-lease-time 7200;
 }
 EOF"
-sudo dhcpd -t -cf /etc/dhcp/dhcpd.conf && sudo systemctl restart isc-dhcp-server
+    
+    sudo dhcpd -t -cf /etc/dhcp/dhcpd.conf && sudo systemctl restart isc-dhcp-server
+    echo "CONFIGURACIÓN APLICADA CON ÉXITO."
+    read -p "Presione Enter para continuar..."
+}
 
-echo -e "\n========================================================="
-echo "                     MONITOREO"
-echo "=========================================================="
-echo "1) Estado del servicio:"
-sudo systemctl is-active --quiet isc-dhcp-server && echo "Servicio: FUNCIONANDO" || echo "Servicio: ERROR"
-echo "2) Equipos conectados:"
-LEASES_FILE="/var/lib/dhcp/dhcpd.leases" 
-if [ -f "$LEASES_FILE" ]; then
-    echo -e "IP ASIGNADA\tMAC ADDRESS\t\tNOMBRE EQUIPO"
-    awk '
-    /^lease/ { ip=$2 }
-    /hardware ethernet/ { mac=$3; gsub(/;/,"",mac) }
-    /client-hostname/ { name=$2; gsub(/;/,"",name); gsub(/"/,"",name) }
-    /^}/ { printf "%s\t%s\t%s\n", ip, mac, (name==""?"(N/A)":name); ip=mac=name="" }
-    ' "$LEASES_FILE" | sort | uniq
-else
-    echo "No hay concesiones activas actualmente"
-fi
+monitoreo(){
+    echo "========================================================="
+    echo "                 MONITOREO DEL SERVIDOR"
+    echo "========================================================="
+    echo "Estado del servicio: "
+    sudo systemctl is-active --quiet isc-dhcp-server && echo "FUNCIONANDO" || echo "ERROR / DETENIDO"
+    
+    echo "Equipos conectados (Concesiones):"
+    LEASES_FILE="/var/lib/dhcp/dhcpd.leases" 
+    if [ -f "$LEASES_FILE" ]; then
+        echo -e "IP ASIGNADA\tMAC ADDRESS\t\tNOMBRE EQUIPO"
+        awk '
+        /^lease/ { ip=$2 }
+        /hardware ethernet/ { mac=$3; gsub(/;/,"",mac) }
+        /client-hostname/ { name=$2; gsub(/;/,"",name); gsub(/"/,"",name) }
+        /^}/ { printf "%s\t%s\t%s\n", ip, mac, (name==""?"(N/A)":name); ip=mac=name="" }
+        ' "$LEASES_FILE" | sort | uniq
+    else
+        echo "No hay concesiones activas actualmente."
+    fi
+    echo "========================================================="
+    read -p "Presione Enter para volver al menú..."
+}
+
+instalacion
+
+while true; do
+    echo "      ******************************************"
+    echo "      * PANEL DE CONTROL DHCP SERVER     *"
+    echo "      ******************************************"
+    echo "      1. Configurar nuevo ámbito (Scope)"
+    echo "      2. Monitorear clientes conectados"
+    echo "      3. Salir"
+    echo "      ******************************************"
+    read -p "Seleccione una opción [1-3]: " opcion
+
+    case $opcion in
+        1) configurar_dhcp ;;
+        2) monitoreo ;;
+        3) 
+            echo "Saliendo..."
+            exit 0
+            ;;
+        *) 
+            echo "Opción no válida."
+            sleep 1
+            ;;
+    esac
+done
