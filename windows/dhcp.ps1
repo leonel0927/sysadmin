@@ -7,8 +7,8 @@
             if ([int]$p -gt 255) { return $false }
         }
         $v = [double]$partes[0] * 16777216 + [double]$partes[1] * 65536 + [double]$partes[2] * 256 + [double]$partes[3]
-        $min = 16777217    # 1.0.0.1
-        $max = 4294967294  # 255.255.255.254
+        $min = 16777217  
+        $max = 4294967294 
         if ($v -lt $min -or $v -gt $max) { return $false }
         return $true
     }
