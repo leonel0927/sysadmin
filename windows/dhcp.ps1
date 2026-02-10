@@ -13,12 +13,21 @@
     }
     return $false
 }
+function comparar_red {
+    param($ip1, $ip2)
+    $red1 = $ip1.Substring(0, $ip1.LastIndexOf('.'))
+    $red2 = $ip2.Substring(0, $ip2.LastIndexOf('.'))
+    
+    if ($red1 -eq $red2) { return $true }
+    return $false
+}
 
 function validador_rango {
     param($ip)
     $p = $ip.Split('.')
     return [double]$p[0] * 16777216 + [double]$p[1] * 65536 + [double]$p[2] * 256 + [double]$p[3]
 }
+
 function instalacion {
     Write-Host "VERIFICANDO ROL DHCP..."
     $aux = Get-WindowsFeature DHCP -ErrorAction SilentlyContinue
@@ -38,25 +47,39 @@ function configurar_dhcp {
         $rinicial = Read-Host "IP INICIAL DEL RANGO"
         $rfinal   = Read-Host "IP FINAL DEL RANGO"
         if ((verificador_ip $rinicial) -and (verificador_ip $rfinal)) {
-            if ((validador_rango $rinicial) -le (validador_rango $rfinal)) { break } 
-            else { Write-Host "ERROR: La IP inicial debe ser menor a la final." }
-        } else { Write-Host "ERROR: Formato de IP inválido o fuera de rango (1.0.0.1 - 255.255.255.254)." }
+            if (comparar_red $rinicial $rfinal) {
+                if ((validador_rango $rinicial) -le (validador_rango $rfinal)) { break } 
+                else { Write-Host "ERROR: La IP inicial debe ser menor a la final." }
+            } else { Write-Host "ERROR: La IP inicial y final deben pertenecer a la misma red." }
+        } else { Write-Host "ERROR: Formato de IP inválido o fuera de rango." }
     }
+
     $tiempoInput = Read-Host "TIEMPO DE CONCESIÓN (HH:mm:ss, ej: 08:00:00)"
+
     while ($true) {
         $dns = Read-Host "IP DEL SERVIDOR DNS"
-        if (verificador_ip $dns) { break } else { Write-Host "IP DNS INVÁLIDA" }
+        if (verificador_ip $dns) {
+            if (comparar_red $dns $rinicial) { break } 
+            else { Write-Host "ERROR: El DNS debe estar en la misma red ($rinicial)" }
+        } else { Write-Host "IP DNS INVÁLIDA" }
     }
+
     while ($true) {
         $ptenlace = Read-Host "PUERTA DE ENLACE (GATEWAY)"
-        if (verificador_ip $ptenlace) { break } else { Write-Host "IP GATEWAY INVÁLIDA" }
+        if (verificador_ip $ptenlace) {
+            if (comparar_red $ptenlace $rinicial) { break } 
+            else { Write-Host "ERROR: El Gateway debe estar en la misma red ($rinicial)" }
+        } else { Write-Host "IP GATEWAY INVÁLIDA" }
     }
+
     $red = $rinicial.Substring(0, $rinicial.LastIndexOf('.')) + ".0"
     $ip_servidor = ($rinicial.Substring(0, $rinicial.LastIndexOf('.')) + ".1")
+
     Write-Host "CONFIGURANDO INTERFAZ ETHERNET 2..."
     $adapter = Get-NetAdapter -Name "Ethernet 2" -ErrorAction Stop
     Remove-NetIPAddress -InterfaceIndex $adapter.ifIndex -Confirm:$false -ErrorAction SilentlyContinue
     New-NetIPAddress -InterfaceIndex $adapter.ifIndex -IPAddress $ip_servidor -PrefixLength 24 -Confirm:$false | Out-Null
+
     try {
         Add-DhcpServerv4Scope -Name $scopeName -StartRange $rinicial -EndRange $rfinal -SubnetMask 255.255.255.0 -State Active
         Set-DhcpServerv4OptionValue -OptionId 3 -Value $ptenlace
@@ -69,9 +92,10 @@ function configurar_dhcp {
     }
     Pause
 }
+
 function monitoreo {
     Write-Host "===================================================="
-    Write-Host "             MONITOREO Y VALIDACIÓN"
+    Write-Host "              MONITOREO Y VALIDACIÓN"
     Write-Host "===================================================="
     $status = Get-Service DHCPServer -ErrorAction SilentlyContinue
     if ($status.Status -eq "Running") {
@@ -92,6 +116,7 @@ function monitoreo {
     }
     Write-Host "===================================================="
 }
+
 instalacion
 while ($true) {
     Write-Host "      ******************************************"

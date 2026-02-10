@@ -1,4 +1,5 @@
 #!/bin/bash
+
 verificador_ip(){
     local ip=$1
     if [[ $ip =~ ^([0-9]{1,3})\.([0-9]{1,3})\.([0-9]{1,3})\.([0-9]{1,3})$ ]]; then 
@@ -19,6 +20,18 @@ verificador_ip(){
         return 0
     fi
     return 1
+}
+comparar_red(){
+    local ip1=$1
+    local ip2=$2
+    local red1=$(echo $ip1 | cut -d. -f1-3)
+    local red2=$(echo $ip2 | cut -d. -f1-3)
+
+    if [[ "$red1" == "$red2" ]]; then
+        return 0
+    else
+        return 1 
+    fi
 }
 
 validador_rango(){
@@ -47,16 +60,20 @@ configurar_dhcp(){
     while true; do
         read -p "IP INICIAL: " rinicial
         read -p "IP FINAL: " rfinal
-        if verificador_ip "$rinicial" && verificador_ip "$rfinal"; then
-            numinicial=$(validador_rango "$rinicial")
-            numfinal=$(validador_rango "$rfinal")
-            if [[ $numinicial -le $numfinal ]]; then
-                break
+          if verificador_ip "$rinicial" && verificador_ip "$rfinal"; then
+            if comparar_red "$rinicial" "$rfinal"; then
+                numinicial=$(validador_rango "$rinicial")
+                numfinal=$(validador_rango "$rfinal")
+                if [[ $numinicial -le $numfinal ]]; then
+                    break
+                else
+                    echo "LA IP INICIAL DEBE SER MENOR A LA FINAL"
+                fi
             else
-                echo "ERROR: LA IP INICIAL DEBE SER MENOR A LA FINAL"
+                echo "LAS IPS NO PERTENECEN A LA MISMA RED"
             fi
         else
-            echo "ERROR: FORMATO DE IP INVÁLIDO (1.0.0.1 - 255.255.255.254)"
+            echo "FORMATO DE IP INVÁLIDO"
         fi
     done
 
@@ -64,12 +81,28 @@ configurar_dhcp(){
     
     while true; do
         read -p "IP DNS: " dns
-        verificador_ip "$dns" && break || echo "DNS INVÁLIDO"
+        if verificador_ip "$dns"; then
+            if comparar_red "$dns" "$rinicial"; then
+                break
+            else
+                echo "ERROR: EL DNS DEBE ESTAR EN LA MISMA RED ($rinicial)"
+            fi
+        else
+            echo "DNS INVÁLIDO"
+        fi
     done
 
     while true; do
         read -p "IP PUERTA DE ENLACE: " ptenlace
-        verificador_ip "$ptenlace" && break || echo "PUERTA DE ENLACE INVÁLIDA"
+        if verificador_ip "$ptenlace"; then
+            if comparar_red "$ptenlace" "$rinicial"; then
+                break
+            else
+                echo "ERROR: LA PUERTA DE ENLACE DEBE ESTAR EN LA MISMA RED ($rinicial)"
+            fi
+        else
+            echo "PUERTA DE ENLACE INVÁLIDA"
+        fi
     done
 
     red=$(echo $rinicial | cut -d. -f1-3).0
