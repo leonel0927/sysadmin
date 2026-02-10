@@ -1,6 +1,5 @@
 ﻿function verificador_ip {
     param($ip)
-    # Regex igual al de Linux
     if ($ip -match '^([0-9]{1,3})\.([0-9]{1,3})\.([0-9]{1,3})\.([0-9]{1,3})$') {
         $partes = $matches[1], $matches[2], $matches[3], $matches[4]
         foreach ($p in $partes) {
