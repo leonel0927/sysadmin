@@ -8,7 +8,8 @@
         $v = [double]$partes[0] * 16777216 + [double]$partes[1] * 65536 + [double]$partes[2] * 256 + [double]$partes[3]
         $min = 16777217  
         $max = 4294967294 
-        if ($v -lt $min -or $v -gt $max) { return $false }
+	$ip_host = 2130706432
+        if ($v -lt $min -or $v -gt $max -or $v -eq $ip_host -or $v -eq ($ip_host + 1) ) { return $false }
         return $true
     }
     return $false
@@ -29,14 +30,14 @@ function validador_rango {
 }
 
 function instalacion {
-    Write-Host "VERIFICANDO ROL DHCP..."
+    Write-Host "VERIFICANDO DHCP..."
     $aux = Get-WindowsFeature DHCP -ErrorAction SilentlyContinue
     if ($aux.Installed) {
         Write-Host "ESTADO: INSTALADO"
     } else {
-        Write-Host "INSTALANDO ROL DHCP..."
+        Write-Host "INSTALANDO DHCP..."
         Install-WindowsFeature DHCP -IncludeManagementTools | Out-Null
-        Write-Host "INSTALACIÓN COMPLETADA."
+        Write-Host "INSTALACIÓN COMPLETA."
     }
 }
 
@@ -53,38 +54,47 @@ function configurar_dhcp {
             } else { Write-Host "ERROR: La IP inicial y final deben pertenecer a la misma red." }
         } else { Write-Host "ERROR: Formato de IP inválido o fuera de rango." }
     }
-
-    $tiempoInput = Read-Host "TIEMPO DE CONCESIÓN (HH:mm:ss, ej: 08:00:00)"
-
+while ($true) { 
+    $tiempoInput = Read-Host "TIEMPO DE CONCESIÓN: "
+    if ($tiempoInput -match "^\d+$" -and [int]$tiempoInput -gt 0){
+	$tiempoInput = [int]$tiempoInput
+	break
+    }else{
+	Write-Host "ERROR: El numero debe ser mayor a 0 y entero"
+	}
+}
     while ($true) {
         $dns = Read-Host "IP DEL SERVIDOR DNS"
-        if (verificador_ip $dns) {
-            if (comparar_red $dns $rinicial) { break } 
-            else { Write-Host "ERROR: El DNS debe estar en la misma red ($rinicial)" }
+        if ( [string]::IsNullOrWhiteSpace($dns) -or (verificador_ip $dns)) {
+               break  
         } else { Write-Host "IP DNS INVÁLIDA" }
     }
 
     while ($true) {
         $ptenlace = Read-Host "PUERTA DE ENLACE (GATEWAY)"
-        if (verificador_ip $ptenlace) {
-            if (comparar_red $ptenlace $rinicial) { break } 
-            else { Write-Host "ERROR: El Gateway debe estar en la misma red ($rinicial)" }
+        if ( [string]::IsNullOrWhiteSpace($ptenalce) -or (verificador_ip $ptenlace)) {
+            break
         } else { Write-Host "IP GATEWAY INVÁLIDA" }
     }
-
     $red = $rinicial.Substring(0, $rinicial.LastIndexOf('.')) + ".0"
-    $ip_servidor = ($rinicial.Substring(0, $rinicial.LastIndexOf('.')) + ".1")
-
+    $ip_servidor = $rinicial.Trim()
     Write-Host "CONFIGURANDO INTERFAZ ETHERNET 2..."
     $adapter = Get-NetAdapter -Name "Ethernet 2" -ErrorAction Stop
     Remove-NetIPAddress -InterfaceIndex $adapter.ifIndex -Confirm:$false -ErrorAction SilentlyContinue
     New-NetIPAddress -InterfaceIndex $adapter.ifIndex -IPAddress $ip_servidor -PrefixLength 24 -Confirm:$false | Out-Null
-
+    $octetos = $rinicial.Split('.')
+    $ultimo = [int]$octetos[3] + 1
+    $rcliente = "$($octetos[0]).$($octetos[1]).$($octetos[2]).$ultimo"	
     try {
-        Add-DhcpServerv4Scope -Name $scopeName -StartRange $rinicial -EndRange $rfinal -SubnetMask 255.255.255.0 -State Active
-        Set-DhcpServerv4OptionValue -OptionId 3 -Value $ptenlace
-        Set-DhcpServerv4OptionValue -OptionId 6 -Value $dns
-        Set-DhcpServerv4Scope -ScopeId $red -LeaseDuration ([timespan]$tiempoInput)
+	
+        Add-DhcpServerv4Scope -Name $scopeName -StartRange $rcliente -EndRange $rfinal -SubnetMask 255.255.255.0 -State Active
+        if (-not [string]::IsNullOrWhiteSpace($ptenlace)) {
+		Set-DhcpServerv4OptionValue -OptionId 3 -Value $ptenlace
+	}
+        if (-not [string]::IsNullOrWhiteSpace($dns)) {
+		Set-DhcpServerv4OptionValue -OptionId 6 -Value $dns
+	}
+        Set-DhcpServerv4Scope -ScopeId $red -LeaseDuration ([timespan]::FromSeconds($tiempoInput))
         Restart-Service DHCPServer
         Write-Host "DHCP CONFIGURADO Y ACTIVO EN ETHERNET 2."
     } catch {
@@ -122,7 +132,7 @@ while ($true) {
     Write-Host "      ******************************************"
     Write-Host "      * PANEL DE CONTROL DHCP (WINDOWS SERVER) *"
     Write-Host "      ******************************************"
-    Write-Host "      1. Configurar nuevo ámbito (Scope)"
+    Write-Host "      1. Configurar nuevo ambito (Scope)"
     Write-Host "      2. Monitorear clientes conectados"
     Write-Host "      3. Salir"
     Write-Host "      ******************************************"
@@ -131,6 +141,6 @@ while ($true) {
         "1" { configurar_dhcp }
         "2" { monitoreo }
         "3" { Write-Host "Saliendo..."; exit }
-        default { Write-Host "Opción no válida."; }
+        default { Write-Host "Opcion no valida."; }
     }
 }
