@@ -9,10 +9,10 @@ verificador_ip(){
         for i in {0..3}; do
             if [[ ${partes[$i]} -gt 255 ]]; then return 1; fi
         done
-        local valor_host=$(( (127 << 24) + 0 ))
-        local valor_ip=$(( (${partes[0]} << 24) + (${partes[1]} << 16) + (${partes[2]} << 8) + ${partes[3]} ))
-        local valor_minimo=$(( (1 << 24) + (0 << 16) + (0 << 8) + 1 ))
-        local valor_maximo=$(( (255 << 24) + (255 << 16) + (255 << 8) + 254 )) 
+        local valor_host=$((( (127 << 24) + 0 )))
+        local valor_ip=$((( (${partes[0]} << 24) + (${partes[1]} << 16) + (${partes[2]} << 8) + ${partes[3]} )))
+        local valor_minimo=$((( (1 << 24) + (0 << 16) + (0 << 8) + 1 )))
+        local valor_maximo=$((( (255 << 24) + (255 << 16) + (255 << 8) + 254 )))
        if [[ $valor_ip -lt $valor_minimo || $valor_ip -gt $valor_maximo || $valor_ip -eq $valor_host ||  $valor_ip -eq $(($valor_host + 1 )) ]]; then
             return 1
         fi
@@ -89,16 +89,16 @@ configurar_dhcp(){
     sudo ip addr add $ip_servidor/24 dev enp0s8
     sudo ip link set enp0s8 up
     echo "GENERANDO dhcpd.conf..."
-   CONF= "authoritative;"
+   CONF="authoritative;"
   CONF="${CONF}"$'\n'"subnet $red netmask 255.255.255.0 {"
   CONF="${CONF}"$'\n'" range $rinicial $rfinal;"
 
  if [[ -n "$ptenlace" ]]; then
-       CONF="${CONF}"'\n'" option routers $ptenlace;"
+       CONF="${CONF}"$'\n'" option routers $ptenlace;"
 fi
 
 if [[ -n "$dns" ]]; then
-    CONF="{$CONF}"$'\n'" option domain-name-servers $dns;"
+    CONF="${CONF}"$'\n'" option domain-name-servers $dns;"
 fi
  CONF="${CONF}"$'\n'" default-lease-time $tiempo;"
   CONF="${CONF}"$'\n'" max-lease-time 7200;"
