@@ -1,11 +1,12 @@
 #!/bin/bash
-verificaion_instalacion(){
+verificacion_instalacion(){
     local paquete="$1"
  echo "VERIFICANDO SERVIDOR..."
-    if dpkg -l | grep -q $1; then
+    if dpkg -l | grep -q "$paquete"; then
         echo "ESTADO: INSTALADO"
     else
         echo "INSTALANDO SERVIDOR..."
-        sudo apt-get update && sudo apt-get install -y $1  >/dev/null 2>&1
+        sudo apt-get install -y $paquete  >/dev/null 2>&1
     fi
+        read -p "PRESIONE ENTER PARA SALIR...."
 }
