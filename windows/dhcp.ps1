@@ -1,19 +1,6 @@
-﻿function verificador_ip {
-    param($ip)
-    if ($ip -match '^([0-9]{1,3})\.([0-9]{1,3})\.([0-9]{1,3})\.([0-9]{1,3})$') {
-        $partes = $matches[1], $matches[2], $matches[3], $matches[4]
-        foreach ($p in $partes) {
-            if ([int]$p -gt 255) { return $false }
-        }
-        $v = [double]$partes[0] * 16777216 + [double]$partes[1] * 65536 + [double]$partes[2] * 256 + [double]$partes[3]
-        $min = 16777217  
-        $max = 4294967294 
-	$ip_host = 2130706432
-        if ($v -lt $min -or $v -gt $max -or $v -eq $ip_host -or $v -eq ($ip_host + 1) ) { return $false }
-        return $true
-    }
-    return $false
-}
+﻿    . "Z:\Funciones\verificador_ip.ps1"
+    . "Z:\Funciones\instalacion.ps1"
+    . "Z:\Funciones\status.ps1"
 function comparar_red {
     param($ip1, $ip2)
     $red1 = $ip1.Substring(0, $ip1.LastIndexOf('.'))
@@ -30,15 +17,8 @@ function validador_rango {
 }
 
 function instalacion {
-    Write-Host "VERIFICANDO DHCP..."
-    $aux = Get-WindowsFeature DHCP -ErrorAction SilentlyContinue
-    if ($aux.Installed) {
-        Write-Host "ESTADO: INSTALADO"
-    } else {
-        Write-Host "INSTALANDO DHCP..."
-        Install-WindowsFeature DHCP -IncludeManagementTools | Out-Null
-        Write-Host "INSTALACIÓN COMPLETA."
-    }
+  instalar "DHCP"
+  Read-Host "ENTER PARA SALIR"
 }
 
 function configurar_dhcp {
@@ -47,7 +27,7 @@ function configurar_dhcp {
     while ($true) { 
         $rinicial = Read-Host "IP INICIAL DEL RANGO"
         $rfinal   = Read-Host "IP FINAL DEL RANGO"
-        if ((verificador_ip $rinicial) -and (verificador_ip $rfinal)) {
+        if ((verificador_ip "$rinicial") -and ("verificador_ip $rfinal")) {
             if (comparar_red $rinicial $rfinal) {
                 if ((validador_rango $rinicial) -le (validador_rango $rfinal)) { break } 
                 else { Write-Host "ERROR: La IP inicial debe ser menor a la final." }
@@ -65,14 +45,14 @@ while ($true) {
 }
     while ($true) {
         $dns = Read-Host "IP DEL SERVIDOR DNS"
-        if ( [string]::IsNullOrWhiteSpace($dns) -or (verificador_ip $dns)) {
+        if ( [string]::IsNullOrWhiteSpace($dns) -or (verificador_ip "$dns")) {
                break  
         } else { Write-Host "IP DNS INVÁLIDA" }
     }
 
     while ($true) {
         $ptenlace = Read-Host "PUERTA DE ENLACE (GATEWAY)"
-        if ( [string]::IsNullOrWhiteSpace($ptenalce) -or (verificador_ip $ptenlace)) {
+        if ( [string]::IsNullOrWhiteSpace($ptenalce) -or (verificador_ip "$ptenlace")) {
             break
         } else { Write-Host "IP GATEWAY INVÁLIDA" }
     }
@@ -107,12 +87,7 @@ function monitoreo {
     Write-Host "===================================================="
     Write-Host "              MONITOREO Y VALIDACIÓN"
     Write-Host "===================================================="
-    $status = Get-Service DHCPServer -ErrorAction SilentlyContinue
-    if ($status.Status -eq "Running") {
-        Write-Host "SERVICIO:  EN EJECUCIÓN "
-    } else {
-        Write-Host "SERVICIO:  DETENIDO "
-    }
+    status "DHCP"
     Write-Host "CONCESIONES (LEASES) ACTIVAS:"
     $scopes = Get-DhcpServerv4Scope
     foreach ($s in $scopes) {

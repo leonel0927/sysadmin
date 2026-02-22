@@ -1,25 +1,8 @@
 #!/bin/bash
-verificador_ip(){
-    local ip=$1
-    if [[ $ip =~ ^([0-9]{1,3})\.([0-9]{1,3})\.([0-9]{1,3})\.([0-9]{1,3})$ ]]; then 
-        OIFS=$IFS
-        IFS='.'
-        partes=($ip)
-        IFS=$OIFS
-        for i in {0..3}; do
-            if [[ ${partes[$i]} -gt 255 ]]; then return 1; fi
-        done
-        local valor_host=$((( (127 << 24) + 0 )))
-        local valor_ip=$((( (${partes[0]} << 24) + (${partes[1]} << 16) + (${partes[2]} << 8) + ${partes[3]} )))
-        local valor_minimo=$((( (1 << 24) + (0 << 16) + (0 << 8) + 1 )))
-        local valor_maximo=$((( (255 << 24) + (255 << 16) + (255 << 8) + 254 )))
-       if [[ $valor_ip -lt $valor_minimo || $valor_ip -gt $valor_maximo || $valor_ip -eq $valor_host ||  $valor_ip -eq $(($valor_host + 1 )) ]]; then
-            return 1
-        fi
-        return 0
-    fi
-    return 1
-}
+source /home/srv-linux-server/SCRIPS2/FUNCIONES/verificador_ip.sh
+source /home/srv-linux-server/SCRIPS2/FUNCIONES/instalacion.sh
+source /home/srv-linux-server/SCRIPS2/FUNCIONES/status.sh
+
 comparar_red(){
     local ip1=$1
     local ip2=$2
@@ -39,15 +22,10 @@ validador_rango(){
     echo $(( (p1 << 24) + (p2 << 16) + (p3 << 8) + p4 ))
 }
 instalacion(){
-    echo "VERIFICANDO SERVIDOR..."
-    if dpkg -l | grep -q isc-dhcp-server; then
-        echo "ESTADO: INSTALADO"
-    else
-        echo "INSTALANDO SERVIDOR..."
-        sudo apt-get update && sudo apt-get install -y isc-dhcp-server
-    fi
+    verificaion_instalacion "isc-dhcp-server"
 }
 configurar_dhcp(){
+clear
     echo "--- NUEVA CONFIGURACIÓN DE ÁMBITO ---"
     read -p "NOMBRE DEL AMBITO: " scope
     
@@ -110,11 +88,13 @@ sudo sed -i "s/INTERFACESv4=.*/INTERFACESv4=enp0s8/" /etc/default/isc-dhcp-serve
     read -p "Presione Enter para continuar..."
 }
 monitoreo(){
+clear
     echo "========================================================="
     echo "                 MONITOREO DEL SERVIDOR"
     echo "========================================================="
     echo "Estado del servicio: "
-    sudo systemctl is-active --quiet isc-dhcp-server && echo "FUNCIONANDO" || echo "ERROR / DETENIDO"   
+    verificador_status "isc-dhcp-server"
+    #sudo systemctl is-active --quiet isc-dhcp-server && echo "FUNCIONANDO" || echo "ERROR / DETENIDO"   
     echo "Equipos conectados (Concesiones):"
     LEASES_FILE="/var/lib/dhcp/dhcpd.leases" 
     if [ -f "$LEASES_FILE" ]; then
@@ -132,6 +112,7 @@ monitoreo(){
     read -p "Presione Enter para volver al menú..."
 }
 instalacion
+clear
 while true; do
     echo "      ******************************************"
     echo "      * PANEL DE CONTROL DHCP SERVER     *"
@@ -146,6 +127,7 @@ while true; do
         2) monitoreo ;;
         3) 
             echo "Saliendo..."
+            clear
             exit 0
             ;;
         *) 

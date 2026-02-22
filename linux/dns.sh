@@ -1,12 +1,14 @@
 #!/bin/bash
 INTERFAZ="enp0s8"
+ source /home/srv-linux-server/SCRIPS2/FUNCIONES/verificador_ip.sh
+ source /home/srv-linux-server/SCRIPS2/FUNCIONES/status.sh
 instalar() {
     if dpkg -l | grep -E "^ii\s+bind9\s" > /dev/null; then
         echo "SERVICIO YA INSTALADO"
     else
         echo "SERVICIO NO INSTALADO,INSTALACION AUTOMATICA"
         sudo rm -f /var/lib/dpkg/lock-frontend /var/lib/apt/lists/lock
-        sudo apt update -y && sudo apt install -y bind9 bind9utils bind9-doc
+        sudo apt update -y && sudo apt install -y bind9 bind9utils bind9-doc >/dev/null 2>&1
         if [ -d "/etc/bind" ]; then
             echo "INSTALACION EXITOSA"
         else
@@ -14,6 +16,7 @@ instalar() {
             exit 1
         fi
     fi
+    clear
 }
 
 listar(){
@@ -21,7 +24,7 @@ listar(){
     echo "------------------------------------------"
     zonas=$(grep "^zone" /etc/bind/named.conf.local | cut -d'"' -f2 | grep -Ev "localhost|127|255|0|broadcast|in-addr.arpa")
     for zone in $zonas; do
-        IP_ZONE=$(grep -w "A" /var/cache/bind/db.$zone 2>/dev/null | awk '{print $NF}' | head -n1)
+        IP_ZONE=$(grep -E "^($zon|@)[[:space:]]+IN[[:space:]]+A" /var/cache/bind/db.$zone 2>/dev/null | awk '{print $NF}' | head -n1)
         if [ -z "$IP_ZONE" ]; then
             IP_ZONE="IP no encontrada"
         fi
@@ -77,7 +80,7 @@ verificador_dominio(){
     fi
 }
 agregar_dominio() {
-    source /home/srv-linux-server/SCRIPS2/FUNCIONES/verificador_ip.sh
+    source /home/limpio/FUNCIONES/verificador_ip.sh
     while true; do
     read -p "NOMBRE: " DOMINIO
     if verificador_dominio "$DOMINIO"; then
@@ -147,11 +150,7 @@ EOF
 
 comprobar_estado() {
     echo "--- ESTADO DEL SERVICIO ---"
-    if systemctl is-active --quiet bind9; then
-        echo "SERVICIO: ACTIVO"
-    else
-        echo "SERVICIO: ERROR"
-    fi
+    echo "Estado: "&& verificador_status "bind9" 
     read -p "ENTER PARA SALIR"
 }
 instalar
@@ -174,7 +173,9 @@ while true; do
         3) listar ;;
         4) eliminar ;;
         5) ./dhcp.sh ;;
-        6) echo "Cerrando script..."; exit 0 ;;
+        6) echo "Cerrando script..." 
+            clear 
+            exit 0 ;;
         *) echo "Opción inválida." ;;
     esac
 done

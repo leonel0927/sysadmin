@@ -1,4 +1,7 @@
-$interfaz = "Ethernet 2"
+﻿$interfaz = "Ethernet 2"
+    . "Z:\Funciones\verificador_ip.ps1"
+    . "Z:\Funciones\instalacion.ps1"
+    . "Z:\Funciones\status.ps1"
 function Verificador-Dominio {
     param([string]$Dominio)
     $regex = "^([a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}$"
@@ -10,19 +13,8 @@ function Verificador-Dominio {
 }
 
 function Instalar-DNS {
-    $check = Get-WindowsFeature -Name DNS
-    if ($check.Installed) {
-        Write-Host "SERVICIO YA INSTALADO"
-    } else {
-        Write-Host "SERVICIO NO INSTALADO, INSTALACION AUTOMATICA..."
-        Install-WindowsFeature DNS -IncludeManagementTools
-        if ((Get-WindowsFeature -Name DNS).Installed) {
-            Write-Host "INSTALACION EXITOSA"
-        } else {
-            Write-Host "ERROR AL INSTALAR"
-            exit
-        }
-    }
+    instalar "DNS"
+    Read-Host "ENTER PARA SALIR"
 }
 
 function Listar-Dominios {
@@ -70,7 +62,6 @@ function Agregar-Dominio {
         break
         }
     }
-    . "Z:\FUNCIONES\verificador_ip.ps1"
     $ServerIP = (Get-NetIPAddress -InterfaceAlias $interfaz -AddressFamily IPv4 -ErrorAction SilentlyContinue).IPAddress
     while ($true){
     $IP = Read-Host "IP"
@@ -119,10 +110,7 @@ function Agregar-Dominio {
 }
 
 function Comprobar-Estado {
-    $Status = Get-Service -Name DNS
-    Write-Host "--- ESTADO DEL SERVICIO ---"
-    Write-Host "SERVICIO: $($Status.Status)"
-    Read-Host "ENTER PARA SALIR"
+    status "DNS"
 }
 
 Instalar-DNS
