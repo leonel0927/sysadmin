@@ -5,3 +5,4 @@ function status(){
     Write-Host "SERVICIO: $($Status.Status)"
     Read-Host "ENTER PARA SALIR"
 }
+#hola desde linux
