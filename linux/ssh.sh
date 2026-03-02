@@ -3,22 +3,25 @@ source /home/srv-linux-server/SCRIPS2/FUNCIONES/instalacion.sh
 source /home/srv-linux-server/SCRIPS2/FUNCIONES/status.sh
 Activador(){
     clear
-    sudo killall -9 sshd 2>/dev/null
-    echo "ACTIVANDO SERVIDOR"
-    sudo ip addr flush dev enp0s8
-    sudo systemctl start ssh
-    sudo systemctl enable ssh
-    sudo ip addr add 192.168.1.1/24 dev enp0s8
-    echo "SERVIDOR ACTIVADO CON LA IP: 192.168.1.1"
-    read -p "PRESIONE ENTER PARA SALIR...."
-}
-Desactivador(){
-    clear
-    echo "DESACTIVANDO SERVIDOR"
-    sudo systemctl stop ssh
-    sudo systemctl disable ssh
-    echo "SERVIDOR DESACTIVADO"
-    read -p "PRESIONE ENTER PARA SALIR...."
+    echo "ACTIVANDO SERVIDOR SSH..."
+    sudo systemctl enable ssh >/dev/null 2>&1
+    sudo systemctl restart ssh >/dev/null 2>&1
+    sudo ufw allow 22/tcp >/dev/null 2>&1
+    IP_FINAL=$(ip -4 addr show enp0s9 | grep -oP '(?<=inet\s)\d+(\.\d+){3}' | head -n 1)
+    echo "------------------------------------------------"
+    if systemctl is-active --quiet ssh; then
+        echo "ESTADO: SERVIDOR ACTIVO"
+        if [ -n "$IP_FINAL" ]; then
+            echo "SERVIDOR ESCUCHANDO EN: $IP_FINAL"
+        else
+            echo "SERVIDOR ACTIVO (No se detectó IP en enp0s9)"
+        fi
+    else
+        echo "ESTADO: ERROR AL INICIAR EL SERVICIO"
+    fi
+    echo "------------------------------------------------"
+    
+    read -p "PRESIONE ENTER PARA VOLVER AL MENU...."
 }
 while true; do
 clear
@@ -27,15 +30,13 @@ clear
     echo "1) Instalar"
     echo "2) Estado"
     echo "3) Activar"
-    echo "4) Desactivar"
-    echo "5) Salir"
+    echo "4) Salir"
     read -p "Opcion: " opc
     case $opc in
         1) verificacion_instalacion "openssh-server" ;;
         2) verificador_status "ssh" ;;
         3) Activador ;;
-        4) Desactivador ;;
-        5) echo "Cerrando script..." 
+        4) echo "Cerrando script..." 
             clear 
             exit 0 ;;
         *) echo "Opción inválida." ;;

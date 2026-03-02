@@ -2,28 +2,25 @@
   . "Z:\Funciones\status.ps1"
 function Activador {
     Clear-Host
-    Write-Host "ACTIVANDO SERVIDOR Y CONFIGURANDO RED..."
-    Stop-Service sshd -ErrorAction SilentlyContinue
-    $interfaz = "Ethernet 2" 
-    $ip = "192.168.1.1"
-    $mask = 24
-    Remove-NetIPAddress -InterfaceAlias $interfaz -Confirm:$false -ErrorAction SilentlyContinue
-    New-NetIPAddress -InterfaceAlias $interfaz -IPAddress $ip -PrefixLength $mask -ErrorAction SilentlyContinue
-    Start-Service sshd
-    Set-Service sshd -StartupType Automatic
-     if (!(Get-NetFirewallRule -Name "OpenSSH-Server-In-TCP" -ErrorAction SilentlyContinue)) {
-        New-NetFirewallRule -Name "OpenSSH-Server-In-TCP" -DisplayName "OpenSSH Server (TCP-In)" -Enabled True -Direction Inbound -Protocol TCP -LocalPort 22 -Action Allow
+    Write-Host "       ACTIVANDO SSH       "
+    Write-Host "Configurando servicio"
+    Set-Service sshd -StartupType Automatic -ErrorAction SilentlyContinue
+    Restart-Service sshd -ErrorAction SilentlyContinue
+    if (!(Get-NetFirewallRule -Name "OpenSSH-Port-22" -ErrorAction SilentlyContinue)) {
+        New-NetFirewallRule -Name "OpenSSH-Port-22" -DisplayName "OpenSSH-Server-In-TCP" -Enabled True -Direction Inbound -Protocol TCP -LocalPort 22 -Action Allow | Out-Null
     }
+    $ipMostrar = Get-NetIPAddress -InterfaceAlias "Ethernet 3" -AddressFamily IPv4 -ErrorAction SilentlyContinue | 
+                 Select-Object -ExpandProperty IPAddress -First 1
 
-    Write-Host "SERVIDOR ACTIVADO CON LA IP: $ip"
-    Pause
-}
-function Desactivador {
-    Clear-Host
-    Write-Host "DESACTIVANDO SERVIDOR..."
-    Stop-Service sshd
-    Set-Service sshd -StartupType Disabled
-    Write-Host "SERVIDOR DESACTIVADO"
+    Write-Host "------------------------------------------------"
+    if ((Get-Service sshd).Status -eq "Running") {
+        Write-Host " SERVIDOR ACTIVO"
+        Write-Host " IP FIJA DETECTADA: $ipMostrar"
+    } else {
+        Write-Host " ERROR AL INICIAR SERVICIO"
+    }
+    Write-Host "------------------------------------------------"
+    
     Pause
 }
 while ($true) {
@@ -32,8 +29,7 @@ while ($true) {
     Write-Host "1) Instalar"
     Write-Host "2) Estado"
     Write-Host "3) Activar"
-    Write-Host "4) Desactivar"
-    Write-Host "5) Salir"
+    Write-Host "4) Salir"
     
     $opc = Read-Host "Opcion"
 
@@ -41,8 +37,7 @@ while ($true) {
         "1" { instalar "OpenSSH.Server" }
         "2" { status "sshd" }
         "3" { Activador }
-        "4" { Desactivador }
-        "5" { 
+        "4" { 
             Write-Host "Cerrando script..."
             exit 
         }

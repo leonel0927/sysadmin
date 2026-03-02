@@ -80,7 +80,6 @@ verificador_dominio(){
     fi
 }
 agregar_dominio() {
-    source /home/limpio/FUNCIONES/verificador_ip.sh
     while true; do
     read -p "NOMBRE: " DOMINIO
     if verificador_dominio "$DOMINIO"; then

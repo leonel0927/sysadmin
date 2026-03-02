@@ -9,9 +9,9 @@ echo "--SELECCIONE UNA OPCION:"
     echo "4) Salir"
     read -p "SELECCIONE UNA OPCION: " opcion
     case $opcion in
-    1)./dhcp.sh ;;
-    2)./dns.sh ;;
-    3)./ssh.sh ;;
+    1)bash ./dhcp.sh ;;
+    2)bash ./dns.sh ;;
+    3)bash ./ssh.sh ;;
     4) echo "Saliendo.."
         exit 0 ;;
     *) 

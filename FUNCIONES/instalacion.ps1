@@ -1,4 +1,4 @@
-function instalar {
+function verificar_instalacion {
     param ([string]$pak)
     $chequeo = Get-WindowsFeature -Name $pak -ErrorAction SilentlyContinue
     if ($chequeo -and $chequeo.Installed) {
@@ -13,5 +13,4 @@ function instalar {
             Add-WindowsCapability -Online -Name $cap.Name -ErrorAction SilentlyContinue
         }
     }
-    Pause
 }
