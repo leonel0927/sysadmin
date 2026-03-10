@@ -1,6 +1,7 @@
 #!/bin/bash
 source /home/srv-linux-server/SCRIPS2/FUNCIONES/instalacion.sh
 source /home/srv-linux-server/SCRIPS2/FUNCIONES/status.sh
+
 instalar(){
     verificacion_instalacion "vsftpd"
 }
@@ -8,6 +9,7 @@ instalar(){
 verificar(){
     verificador_status "vsftpd"
 }
+
 archivos(){
     Entrada="/srv/ftp"
     Genera="$Entrada/general"
@@ -20,8 +22,12 @@ archivos(){
     [ ! -d "$gruposC" ] && sudo mkdir -p "$gruposC"
     sudo chown root:root "$Entrada"
     sudo chmod 755 "$Entrada"
+    
+    # Se usa 777 para que todos escriban/eliminen. 
+    # Si quieres que SOLO el dueño borre lo suyo, usa chmod 1777 (Sticky Bit)
     sudo chown ftp:nogroup "$Genera"
     sudo chmod 777 "$Genera"
+    
     sudo chown root:root "$gruposC"
     sudo chmod 711 "$gruposC"
     for grupo in "${GRUPOS[@]}"; do
@@ -30,6 +36,7 @@ archivos(){
         sudo chmod 775 "$gruposC/$grupo"
     done
 }
+
 agg_users(){
     read -p "Cuántos usuarios desea agregar?: " users
     for ((i=1; i<=$users; i++))
@@ -53,15 +60,20 @@ agg_users(){
         sudo mkdir -p "$usuarioH/general" "$usuarioH/$gpp" "$usuarioH/mi_espacio"
         sudo umount -l "$usuarioH/general" 2>/dev/null
         sudo umount -l "$usuarioH/$gpp" 2>/dev/null
+        
         sudo mount --bind /srv/ftp/general "$usuarioH/general"
         sudo mount -o remount,rw "$usuarioH/general"
         sudo mount --bind "/srv/ftp/grupos/$gpp" "$usuarioH/$gpp"
         sudo mount -o remount,rw "$usuarioH/$gpp"
+        
         sudo sed -i "\|$usuarioH/|d" /etc/fstab
         echo "/srv/ftp/general $usuarioH/general none bind 0 0" | sudo tee -a /etc/fstab
         echo "/srv/ftp/grupos/$gpp $usuarioH/$gpp none bind 0 0" | sudo tee -a /etc/fstab
+        
         sudo chown -R "$nomU:$gpp" "$usuarioH"
         sudo chmod 755 "$usuarioH"
+        
+        # Permiso total en el punto de montaje para permitir borrado
         sudo chmod 777 "$usuarioH/general"
     done
     read -p "PRESIONE ENTER PARA VOLVER"
@@ -74,7 +86,8 @@ listen=NO
 listen_ipv6=YES
 local_enable=YES
 write_enable=YES
-local_umask=022
+# umask 000 permite que lo creado tenga permisos totales (777)
+local_umask=000
 dirmessage_enable=YES
 use_localtime=YES
 xferlog_enable=YES
@@ -89,7 +102,6 @@ pam_service_name=vsftpd
 anonymous_enable=YES
 no_anon_password=YES
 anon_root=/srv/ftp
-# carpetas ocultas para los anonimos
 deny_file={grupos}
 hide_file={grupos}
 
@@ -105,6 +117,7 @@ EOF
 
     sudo systemctl restart vsftpd
 }
+
 reubicar(){
     clear
     read -p "Ingrese el nombre del usuario a modificar: " nomU
@@ -133,10 +146,14 @@ reubicar(){
     echo "/srv/ftp/general $usuarioH/general none bind 0 0" | sudo tee -a /etc/fstab
     echo "/srv/ftp/grupos/$gpp $usuarioH/$gpp none bind 0 0" | sudo tee -a /etc/fstab
     sudo chown -R "$nomU:$gpp" "$usuarioH"
-    sudo chmod 775 "$usuarioH/general"
+    
+    # Asegurar permisos de borrado tras reubicar
+    sudo chmod 777 "$usuarioH/general"
+    
     echo -e "Usuario $nomU reubicado"
     read -p "ENTER PARA VOLVER"
 }
+
 archivos
 servicios
 sudo ufw allow 21/tcp

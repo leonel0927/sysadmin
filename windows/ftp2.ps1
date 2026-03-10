@@ -6,7 +6,7 @@ function Preparar-ServidorFTP {
         Write-Host "Limpiando bloqueos de permisos anteriores..." -ForegroundColor Yellow
         # Usamos CMD para forzar la toma de posesión sin importar los errores NTFS
         cmd /c "takeown /f C:\FTP /r /d s >nul 2>nul"
-        cmd /c "icacls C:\FTP /grant Administrators:(OI)(CI)F /T /Q >nul 2>nul"
+        cmd /c "icacls C:\FTP /grant Administradores:(OI)(CI)F /T /Q >nul 2>nul"
         icacls "C:\FTP" /reset /t /c /l | Out-Null
     }
 
@@ -114,8 +114,8 @@ function Aplicar-SeguridadNTFS {
 
     # 2. PERMISOS EN CARPETA GENERAL (TODOS MODIFICAN)
     # Otorgamos 'M' (Modify) a ambos grupos
-    icacls "C:\FTP\LocalUser\Public\General" /grant "Reprobados:(OI)(CI)M" /Q | Out-Null
-    icacls "C:\FTP\LocalUser\Public\General" /grant "Recursadores:(OI)(CI)M" /Q | Out-Null
+    icacls "C:\FTP\LocalUser\Public\General" /grant "Usuarios:(OI)(CI)M" /Q | Out-Null
+    icacls "C:\FTP\LocalUser\Public\General" /grant "Usuarios:(OI)(CI)M" /Q | Out-Null
     
     # 3. PERMISO PARA "ATRAVESAR" LA CARPETA PUBLIC (Necesario para el Link)
     icacls "C:\FTP\LocalUser\Public" /grant "$($global:AsignacionGrupo):(RX)" /Q | Out-Null

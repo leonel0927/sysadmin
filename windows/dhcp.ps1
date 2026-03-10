@@ -17,7 +17,7 @@ function validador_rango {
 }
 
 function instalacion {
-  instalar "DHCP"
+  verificar_instalacion "DHCP"
   Read-Host "ENTER PARA SALIR"
 }
 
