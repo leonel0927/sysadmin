@@ -1,9 +1,7 @@
 
 function Validar-Puerto {
     param ([int]$Puerto)
-
-    # Puertos reservados para otros servicios criticos (8080 permitido segun practica)
-    $Reservados = @(21, 22, 23, 25, 53, 80, 110, 143, 443, 445, 3306, 3389, 5432)
+    $Reservados = @(21, 22, 23, 25, 53, 110, 143, 443, 445, 3306, 3389, 5432)
 
     if ($Puerto -lt 1 -or $Puerto -gt 65535) {
         Write-Host "ERROR: Puerto fuera de rango valido (1-65535)." -ForegroundColor Red
@@ -111,22 +109,17 @@ function Crear-Pagina-Prueba {
     Write-Host "Pagina index.html creada en: $Ruta" -ForegroundColor Green
 }
 
-# ------------------------------------------------------------
-# SEGURIDAD: OCULTAR HEADERS DEL SERVIDOR
-# ------------------------------------------------------------
 function Aplicar-Seguridad-IIS {
     param ([string]$SitioNombre = "Default Web Site")
 
     Write-Host "Aplicando configuracion de seguridad en IIS..." -ForegroundColor Cyan
 
-    # Eliminar encabezado X-Powered-By
     try {
         Remove-WebConfigurationProperty -PSPath "MACHINE/WEBROOT/APPHOST" `
             -Filter "system.webServer/httpProtocol/customHeaders" `
             -Name "." -AtElement @{name="X-Powered-By"} -ErrorAction SilentlyContinue
     } catch {}
 
-    # Agregar encabezados de seguridad
     $headers = @(
         @{ name = "X-Frame-Options";        value = "SAMEORIGIN" },
         @{ name = "X-Content-Type-Options"; value = "nosniff" }
@@ -139,7 +132,6 @@ function Aplicar-Seguridad-IIS {
         } catch {}
     }
 
-    # Deshabilitar metodos peligrosos (TRACE, TRACK) via Request Filtering
     try {
         Add-WebConfigurationProperty -PSPath "MACHINE/WEBROOT/APPHOST/$SitioNombre" `
             -Filter "system.webServer/security/requestFiltering/verbs" `
@@ -155,23 +147,17 @@ function Aplicar-Seguridad-IIS {
     Write-Host "Seguridad IIS aplicada (X-Powered-By eliminado, headers de seguridad, metodos bloqueados)." -ForegroundColor Green
 }
 
-# ------------------------------------------------------------
-# CONFIGURACION DE FIREWALL
-# ------------------------------------------------------------
 function Configurar-Firewall {
     param ([int]$Puerto, [string]$Servicio)
 
     Write-Host "Configurando firewall para puerto $Puerto..." -ForegroundColor Cyan
 
-    # Eliminar reglas viejas del mismo servicio
     Get-NetFirewallRule -DisplayName "HTTP-$Servicio-*" -ErrorAction SilentlyContinue | Remove-NetFirewallRule
 
-    # Abrir solo el puerto solicitado
     New-NetFirewallRule -DisplayName "HTTP-$Servicio-$Puerto" `
         -Direction Inbound -LocalPort $Puerto -Protocol TCP `
         -Action Allow -ErrorAction SilentlyContinue | Out-Null
 
-    # Si el puerto no es 80, bloquear el 80 si no esta en uso por otro servicio
     if ($Puerto -ne 80) {
         if (-not (Get-NetTCPConnection -LocalPort 80 -ErrorAction SilentlyContinue)) {
             New-NetFirewallRule -DisplayName "HTTP-Block-80" `
@@ -184,15 +170,11 @@ function Configurar-Firewall {
     Write-Host "Firewall configurado: puerto $Puerto abierto." -ForegroundColor Green
 }
 
-# ------------------------------------------------------------
-# PERMISOS DE USUARIO DEDICADO
-# ------------------------------------------------------------
 function Crear-Usuario-Dedicado {
     param ([string]$NombreUsuario, [string]$Directorio)
 
     Write-Host "Configurando usuario dedicado: $NombreUsuario..." -ForegroundColor Cyan
 
-    # Crear usuario local si no existe
     if (-not (Get-LocalUser -Name $NombreUsuario -ErrorAction SilentlyContinue)) {
         $Password = ConvertTo-SecureString "Srv!2024$NombreUsuario" -AsPlainText -Force
         New-LocalUser -Name $NombreUsuario -Password $Password `
@@ -202,7 +184,6 @@ function Crear-Usuario-Dedicado {
         Write-Host "Usuario '$NombreUsuario' creado." -ForegroundColor Green
     }
 
-    # Dar permisos solo sobre el directorio del servicio
     if (Test-Path $Directorio) {
         $acl = Get-Acl $Directorio
         $rule = New-Object System.Security.AccessControl.FileSystemAccessRule(
@@ -214,16 +195,12 @@ function Crear-Usuario-Dedicado {
     }
 }
 
-# ------------------------------------------------------------
-# INSTALAR IIS
-# ------------------------------------------------------------
 function Instalar-IIS {
     param ([int]$Puerto)
 
     $Version = "10.0 (Windows Server 2019)"
     Write-Host "`n[IIS] Verificando instalacion..." -ForegroundColor Cyan
 
-    # Validar e instalar IIS si no esta presente
     $feature = Get-WindowsFeature Web-Server -ErrorAction SilentlyContinue
     if (-not $feature) {
         Write-Host "ERROR: No se puede verificar caracteristicas de Windows. Asegurese de ejecutar como Administrador." -ForegroundColor Red
@@ -245,10 +222,8 @@ function Instalar-IIS {
 
     Import-Module WebAdministration -ErrorAction SilentlyContinue
 
-    # Detener servicio para reconfigurar
     Stop-Service W3SVC -ErrorAction SilentlyContinue
 
-    # Reconfigurar binding de forma robusta
     Write-Host "Configurando puerto $Puerto en IIS..." -ForegroundColor Yellow
     Get-WebBinding -Name "Default Web Site" -ErrorAction SilentlyContinue | Remove-WebBinding
     New-WebBinding -Name "Default Web Site" -Protocol "http" -Port $Puerto -IPAddress "*"
@@ -262,15 +237,11 @@ function Instalar-IIS {
     Pause
 }
 
-# ------------------------------------------------------------
-# INSTALAR APACHE (Windows)
-# ------------------------------------------------------------
 function Instalar-Apache {
     param (
-        [int]$PuertoGeneral # Puerto único para HTTP y HTTPS
+        [int]$PuertoGeneral 
     )
 
-    # Consulta dinamica de version en Chocolatey (apache-httpd)
     $Version = Seleccionar-Version -Paquete "apache-httpd"
     if (-not $Version) {
         Write-Host "No se pudo obtener version de Apache. Abortando." -ForegroundColor Red
@@ -279,7 +250,6 @@ function Instalar-Apache {
 
     Write-Host "`n[Apache] Version seleccionada: $Version" -ForegroundColor Cyan
 
-    # Verificar si Apache ya esta instalado buscando httpd.exe dinamicamente
     $apacheRoot = Get-ChildItem "C:\tools" -Directory -ErrorAction SilentlyContinue |
                   Where-Object { $_.Name -match "(?i)^apache" -and (Test-Path "$($_.FullName)\bin\httpd.exe") } |
                   Sort-Object LastWriteTime -Descending |
@@ -320,7 +290,6 @@ function Instalar-Apache {
     $apacheRootEscaped = $apacheRoot -replace '\\', '/'
     Stop-Service Apache2.4 -ErrorAction SilentlyContinue
 
-    # --- INICIO DE AUTOMATIZACIÓN SSL ---
     Write-Host "Generando certificados SSL autofirmados..." -ForegroundColor Cyan
     $binPath = "$apacheRoot\bin"
     if (Test-Path "$binPath\openssl.exe") {
@@ -329,7 +298,6 @@ function Instalar-Apache {
         Write-Host "Certificados creados exitosamente." -ForegroundColor Green
     }
 
-    # --- CONFIGURACIÓN DE HTTPD.CONF (Módulos y Limpieza) ---
     $confPath = "$apacheRoot\conf\httpd.conf"
     if (Test-Path $confPath) {
         $conf = Get-Content $confPath
@@ -339,14 +307,12 @@ function Instalar-Apache {
         $conf = $conf -replace 'Include conf/extra/httpd-ahssl.conf', '#Include conf/extra/httpd-ahssl.conf'
 
         $conf = $conf -replace '^ServerRoot.*', "ServerRoot `"$apacheRootEscaped`""
-        # Comentamos el Listen en el principal para que no choque con el de SSL
         $conf = $conf -replace 'Listen\s+\d+', "#Listen $PuertoGeneral"
         $conf = $conf -replace '^ServerName.*', "ServerName localhost:$PuertoGeneral"
 
         $conf | Set-Content $confPath
     }
 
-    # --- CONFIGURACIÓN DE HTTPD-SSL.CONF (Puerto Dinámico) ---
     $sslConfPath = "$apacheRoot\conf\extra\httpd-ssl.conf"
     if (Test-Path $sslConfPath) {
         $sslConf = Get-Content $sslConfPath
@@ -367,12 +333,10 @@ function Instalar-Apache {
         New-Item -ItemType Directory -Path $htdocsDir -Force | Out-Null
     }
 
-    # Tu lógica original de usuario y página de prueba
     Crear-Usuario-Dedicado -NombreUsuario "svc_apache" -Directorio $htdocsDir
     Crear-Pagina-Prueba -Ruta $htdocsDir -Servicio "Apache HTTP Server" -Version $Version -Puerto $PuertoGeneral
     Configurar-Firewall -Puerto $PuertoGeneral -Servicio "Apache SSL"
 
-    # Iniciar Apache
     $httpdExe = "$apacheRoot\bin\httpd.exe"
     $apacheSvc = Get-Service Apache2.4 -ErrorAction SilentlyContinue
     if ($apacheSvc) {
@@ -386,14 +350,8 @@ function Instalar-Apache {
     Write-Host "[Apache] Desplegado con SSL en el puerto $PuertoGeneral." -ForegroundColor Green
     Pause
 }
-
-# ------------------------------------------------------------
-# INSTALAR NGINX (Windows)
-# ------------------------------------------------------------
 function Instalar-Nginx {
     param ([int]$Puerto)
-
-    # Seleccion dinamica de version (nombre exacto en Chocolatey: nginx)
     $Version = Seleccionar-Version -Paquete "nginx"
     if (-not $Version) {
         Write-Host "No se pudo obtener version de Nginx. Abortando." -ForegroundColor Red
@@ -402,10 +360,8 @@ function Instalar-Nginx {
 
     Write-Host "`n[Nginx] Instalando version $Version..." -ForegroundColor Cyan
 
-    # Detener proceso previo si existe
     Stop-Process -Name nginx -Force -ErrorAction SilentlyContinue
 
-    # Verificar si nginx ya esta instalado buscando el exe
     $nginxYaInstalado = Get-ChildItem "C:\tools" -Directory -ErrorAction SilentlyContinue |
                         Where-Object { $_.Name -match "^nginx" -and (Test-Path "$($_.FullName)\nginx.exe") } |
                         Select-Object -First 1
@@ -417,14 +373,12 @@ function Instalar-Nginx {
         Write-Host "Nginx ya instalado en: $($nginxYaInstalado.FullName)" -ForegroundColor Yellow
     }
 
-    # Buscar carpeta raiz de nginx: priorizar la que tenga nginx.exe
     $nginxRoot = Get-ChildItem "C:\tools" -Directory -ErrorAction SilentlyContinue |
                  Where-Object { $_.Name -match "^nginx" } |
                  Where-Object { Test-Path "$($_.FullName)\nginx.exe" } |
                  Sort-Object LastWriteTime -Descending |
                  Select-Object -First 1 -ExpandProperty FullName
 
-    # Si ninguna tiene exe, tomar la mas reciente
     if (-not $nginxRoot) {
         $nginxRoot = Get-ChildItem "C:\tools" -Directory -ErrorAction SilentlyContinue |
                      Where-Object { $_.Name -match "^nginx" } |
@@ -439,7 +393,6 @@ function Instalar-Nginx {
 
     Write-Host "Directorio nginx detectado: $nginxRoot" -ForegroundColor Cyan
 
-    # Configurar puerto en nginx.conf
     $confPath = "$nginxRoot\conf\nginx.conf"
     if (Test-Path $confPath) {
         (Get-Content $confPath) -replace 'listen\s+\d+;', "listen $Puerto;" | Set-Content $confPath
@@ -453,13 +406,11 @@ function Instalar-Nginx {
         New-Item -ItemType Directory -Path $htmlDir -Force | Out-Null
     }
 
-    # Usuario dedicado y permisos
     Crear-Usuario-Dedicado -NombreUsuario "svc_nginx" -Directorio $htmlDir
 
     Crear-Pagina-Prueba -Ruta $htmlDir -Servicio "Nginx Open Source" -Version $Version -Puerto $Puerto
     Configurar-Firewall -Puerto $Puerto -Servicio "Nginx"
 
-    # Buscar nginx.exe dentro de la carpeta detectada
     $nginxExe = "$nginxRoot\nginx.exe"
     if (Test-Path $nginxExe) {
         Start-Process $nginxExe -WorkingDirectory $nginxRoot -ErrorAction SilentlyContinue

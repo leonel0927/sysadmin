@@ -1,27 +1,16 @@
-# ============================================================
-#  main.ps1  -  Script Principal de Aprovisionamiento Web
-#  Practica 6 | Windows Server 2019
-#  EJECUTAR como Administrador via SSH/PowerShell
-# ============================================================
 
-# Verificar privilegios de administrador
 if (-not ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()
     ).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
     Write-Host "ERROR: Ejecute este script como Administrador." -ForegroundColor Red
     exit 1
 }
 
-# Cargar funciones externas
 $FuncionesPath = Join-Path $PSScriptRoot "httpF.ps1"
 if (-not (Test-Path $FuncionesPath)) {
     Write-Host "ERROR: No se encontro httpF.ps1 en: $FuncionesPath" -ForegroundColor Red
     exit 1
 }
 . $FuncionesPath
-
-# ------------------------------------------------------------
-# VERIFICAR / INSTALAR .NET 4.8
-# ------------------------------------------------------------
 function Verificar-DotNet {
     $release = (Get-ItemProperty "HKLM:\SOFTWARE\Microsoft\NET Framework Setup\NDP\v4\Full" `
                 -ErrorAction SilentlyContinue).Release
@@ -37,9 +26,6 @@ function Verificar-DotNet {
     }
 }
 
-# ------------------------------------------------------------
-# VERIFICAR / INSTALAR CHOCOLATEY
-# ------------------------------------------------------------
 function Verificar-Chocolatey {
     if (-not (Get-Command choco -ErrorAction SilentlyContinue)) {
         Write-Host "Instalando Chocolatey..." -ForegroundColor Yellow
@@ -48,28 +34,20 @@ function Verificar-Chocolatey {
             [System.Net.ServicePointManager]::SecurityProtocol -bor 3072
         Invoke-Expression ((New-Object System.Net.WebClient).DownloadString(
             'https://community.chocolatey.org/install.ps1'))
-        # Recargar PATH para que choco sea reconocido en la sesion actual
         $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + `
                     [System.Environment]::GetEnvironmentVariable("Path","User")
         Write-Host "Chocolatey instalado correctamente." -ForegroundColor Green
     }
 }
-
-# ------------------------------------------------------------
-# LIMPIAR CONFIGURACIONES PREVIAS
-# ------------------------------------------------------------
 function Limpiar-Configuracion-Previa {
     Write-Host "`nVerificando y limpiando residuos de configuraciones previas..." -ForegroundColor Cyan
 
-    # Detener procesos activos
     Stop-Process -Name nginx   -Force -ErrorAction SilentlyContinue
     Stop-Service  Apache2.4          -ErrorAction SilentlyContinue
     Stop-Service  W3SVC              -ErrorAction SilentlyContinue
 
-    # Borrar reglas de Firewall antiguas del aprovisionador
     Get-NetFirewallRule -DisplayName "HTTP-*" -ErrorAction SilentlyContinue | Remove-NetFirewallRule
 
-    # Borrar index.html anteriores para forzar recreacion
     $rutasHTML = @(
         "C:\tools\nginx\html\index.html",
         "C:\tools\apache24\htdocs\index.html",
@@ -84,13 +62,9 @@ function Limpiar-Configuracion-Previa {
     Write-Host "Limpieza completada.`n" -ForegroundColor Green
 }
 
-# ------------------------------------------------------------
-# LEER PUERTO CON VALIDACION
-# ------------------------------------------------------------
 function Leer-Puerto {
     do {
         $input = Read-Host "Ingrese el puerto de escucha (ej. 8080, 8888, 9000)"
-        # Eliminar caracteres no numericos
         $input = $input -replace '[^0-9]', ''
 
         if ([string]::IsNullOrWhiteSpace($input)) {
@@ -106,9 +80,6 @@ function Leer-Puerto {
     return $puerto
 }
 
-# ------------------------------------------------------------
-# MOSTRAR PUERTOS ACTIVOS
-# ------------------------------------------------------------
 function Mostrar-Puertos {
     Write-Host "`n--- Puertos TCP en escucha (>79) ---" -ForegroundColor Cyan
     Get-NetTCPConnection -State Listen |
@@ -119,17 +90,10 @@ function Mostrar-Puertos {
             State
     Pause
 }
-
-# ============================================================
-#  INICIO DEL SCRIPT
-# ============================================================
 Verificar-DotNet
 Verificar-Chocolatey
 Limpiar-Configuracion-Previa
 
-# ------------------------------------------------------------
-# MENU PRINCIPAL
-# ------------------------------------------------------------
 while ($true) {
     Clear-Host
     Write-Host "==========================================" -ForegroundColor Green
@@ -142,12 +106,11 @@ while ($true) {
     Write-Host "------------------------------------------"
 
     $opc = Read-Host "Seleccione una opcion"
-    $opc = $opc -replace '[^0-9]', ''   # Solo digitos
+    $opc = $opc -replace '[^0-9]', ''  
 
     switch ($opc) {
 
         "1" {
-            # Seleccion de servidor
             Clear-Host
             Write-Host "--- Seleccione el servidor a instalar ---" -ForegroundColor Yellow
             Write-Host " 1. IIS (Internet Information Services)  [Instalacion obligatoria]"
@@ -160,7 +123,6 @@ while ($true) {
 
             if ($tipo -eq "0") { continue }
 
-            # Leer y validar puerto
             $puerto = Leer-Puerto
 
             switch ($tipo) {
