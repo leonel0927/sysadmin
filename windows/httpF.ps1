@@ -1,4 +1,3 @@
-
 function Validar-Puerto {
     param ([int]$Puerto)
     $Reservados = @(21, 22, 23, 25, 53, 110, 143, 443, 445, 3306, 3389, 5432)
@@ -289,6 +288,10 @@ function Instalar-Apache {
 
     $apacheRootEscaped = $apacheRoot -replace '\\', '/'
     Stop-Service Apache2.4 -ErrorAction SilentlyContinue
+    Stop-Service W3SVC -Force -ErrorAction SilentlyContinue
+    Stop-Service WAS -Force -ErrorAction SilentlyContinue
+    Stop-Process -Name httpd -Force -ErrorAction SilentlyContinue
+    Start-Sleep -Seconds 2
 
     Write-Host "Generando certificados SSL autofirmados..." -ForegroundColor Cyan
     $binPath = "$apacheRoot\bin"
@@ -361,6 +364,10 @@ function Instalar-Nginx {
     Write-Host "`n[Nginx] Instalando version $Version..." -ForegroundColor Cyan
 
     Stop-Process -Name nginx -Force -ErrorAction SilentlyContinue
+    Stop-Service W3SVC -Force -ErrorAction SilentlyContinue
+    Stop-Service WAS -Force -ErrorAction SilentlyContinue
+    Stop-Process -Name httpd -Force -ErrorAction SilentlyContinue
+    Start-Sleep -Seconds 2
 
     $nginxYaInstalado = Get-ChildItem "C:\tools" -Directory -ErrorAction SilentlyContinue |
                         Where-Object { $_.Name -match "^nginx" -and (Test-Path "$($_.FullName)\nginx.exe") } |

@@ -4,9 +4,9 @@ source /home/srv-linux-server/SCRIPS2/FUNCIONES/status.sh
 Activador(){
     clear
     echo "ACTIVANDO SERVIDOR SSH..."
-    sudo systemctl enable ssh >/dev/null 2>&1
-    sudo systemctl restart ssh >/dev/null 2>&1
-    sudo ufw allow 22/tcp >/dev/null 2>&1
+    sudo systemctl enable ssh 
+    sudo systemctl restart ssh
+    sudo ufw allow 22/tcp
     IP_FINAL=$(ip -4 addr show enp0s9 | grep -oP '(?<=inet\s)\d+(\.\d+){3}' | head -n 1)
     echo "------------------------------------------------"
     if systemctl is-active --quiet ssh; then
