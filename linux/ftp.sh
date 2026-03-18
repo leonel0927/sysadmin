@@ -4,11 +4,10 @@ source /home/srv-linux-server/SCRIPS2/FUNCIONES/status.sh
 source /home/srv-linux-server/SCRIPS2/linux/httpF.sh
 
 FTP_IP="192.168.117.10"
-FTP_REPO_HTTP="/servidores"
+FTP_REPO_HTTP="/servidores/Linux"
 SSL_DIR="/etc/ssl/practica7"
 DOMAIN="reprobados.com"
-R='\033[0;31m'; G='\033[0;32m'; Y='\033[1;33m'
-B='\033[0;34m'; C='\033[0;36m'; W='\033[0m'
+
 
 instalar(){
     verificacion_instalacion "vsftpd"
@@ -98,7 +97,7 @@ agg_users(){
                 echo "/srv/ftp/servidores/Linux $usuarioH/servidores none bind 0 0" | sudo tee -a /etc/fstab
             fi
             sudo usermod -aG ftphttp "$nomU"
-            echo -e "  ${G}→ Acceso al repositorio de servidores habilitado para $nomU${W}"
+            echo "  → Acceso al repositorio de servidores habilitado para $nomU"
         fi
 
         sudo chown -R "$nomU:$gpp" "$usuarioH"
@@ -106,7 +105,7 @@ agg_users(){
         sudo chmod 777 "$usuarioH/general"
         grep -qxF "$nomU" /etc/vsftpd.userlist 2>/dev/null || \
             echo "$nomU" | sudo tee -a /etc/vsftpd.userlist > /dev/null
-        echo -e "  ${G}→ $nomU agregado a vsftpd.userlist${W}"
+        echo "  → $nomU agregado a vsftpd.userlist"
     done
     read -p "PRESIONE ENTER PARA VOLVER"
 }
@@ -185,13 +184,12 @@ reubicar(){
     echo "/srv/ftp/grupos/$gpp $usuarioH/$gpp none bind 0 0" | sudo tee -a /etc/fstab
     sudo chown -R "$nomU:$gpp" "$usuarioH"
     sudo chmod 777 "$usuarioH/general"
-    echo -e "Usuario $nomU reubicado"
+    echo "Usuario $nomU reubicado"
     read -p "ENTER PARA VOLVER"
 }
+
 preparar_repositorio(){
-    echo -e "\n${B}══════════════════════════════════════${W}"
-    echo -e "${C}  PREPARANDO REPOSITORIO DE SERVIDORES${W}"
-    echo -e "${B}══════════════════════════════════════${W}"
+    echo "  PREPARANDO REPOSITORIO DE SERVIDORES"
 
     declare -A PKGS=(
         ["Apache"]="apache2"
@@ -207,40 +205,40 @@ preparar_repositorio(){
         sudo mkdir -p "$DIR"
 
         if [ -f "$DEST" ] && [ -f "${DEST}.sha256" ]; then
-            echo -e "${Y}  ⚠ $svc ya existe, se omite.${W}"
+            echo "  ⚠ $svc ya existe, se omite."
             continue
         fi
 
-        echo -e "${Y}  Descargando $svc...${W}"
+        echo "  Descargando $svc..."
         cd /tmp || return
         sudo apt-get download "$pkg" 2>/dev/null
         local deb
         deb=$(ls -1t /tmp/${pkg}_*.deb 2>/dev/null | head -1)
 
         if [ -z "$deb" ]; then
-            echo -e "${R}  No se pudo descargar $pkg${W}"
+            echo "  No se pudo descargar $pkg"
             continue
         fi
 
         sudo mv "$deb" "$DEST"
         sha256sum "$DEST" | sudo tee "${DEST}.sha256" > /dev/null
-        echo -e "${G}  ✓ $svc → $(basename $DEST)${W}"
+        echo "  ✓ $svc → $(basename $DEST)"
     done
 
     sudo chown -R root:ftphttp /srv/ftp/servidores
     sudo chmod -R 775 /srv/ftp/servidores
-    echo -e "${G}Repositorio listo.${W}"
+    echo "Repositorio listo."
     read -p "PRESIONE ENTER PARA VOLVER"
 }
+
+
 instalar_desde_ftp(){
-    echo -e "\n${B}══════════════════════════════════════${W}"
-    echo -e "${C}  INSTALAR SERVIDOR DESDE FTP${W}"
-    echo -e "${B}══════════════════════════════════════${W}"
+    echo "  INSTALAR SERVIDOR DESDE FTP"
 
     read -rp "Usuario FTP: " ftp_user
     read -rsp "Contraseña FTP: " ftp_pass; echo ""
 
-    echo -e "\n${Y}Servidores disponibles en el repositorio:${W}"
+    echo -e "\nServidores disponibles en el repositorio:"
     mapfile -t CARPETAS < <(
         curl -s --list-only \
              -u "$ftp_user:$ftp_pass" \
@@ -249,7 +247,7 @@ instalar_desde_ftp(){
     )
 
     if [ ${#CARPETAS[@]} -eq 0 ]; then
-        echo -e "${R}No se encontraron servidores en el repositorio.${W}"
+        echo "No se encontraron servidores en el repositorio."
         read -rp "¿Desea preparar el repositorio ahora? [S/N]: " prep
         [[ "${prep^^}" == "S" ]] && preparar_repositorio
         read -p "PRESIONE ENTER PARA VOLVER"; return
@@ -271,8 +269,7 @@ instalar_desde_ftp(){
     local svc_dir="${CARPETAS[$((sel_svc-1))]}"
     local ruta_svc="$FTP_REPO_HTTP/$svc_dir"
 
-    # Listar archivos .deb
-    echo -e "\n${Y}Archivos disponibles en $svc_dir:${W}"
+    echo -e "\nArchivos disponibles en $svc_dir:"
     mapfile -t ARCHIVOS < <(
         curl -s --list-only \
              -u "$ftp_user:$ftp_pass" \
@@ -281,7 +278,7 @@ instalar_desde_ftp(){
     )
 
     if [ ${#ARCHIVOS[@]} -eq 0 ]; then
-        echo -e "${R}No hay instaladores en $ruta_svc${W}"
+        echo "No hay instaladores en $ruta_svc"
         read -p "PRESIONE ENTER PARA VOLVER"; return
     fi
 
@@ -302,21 +299,20 @@ instalar_desde_ftp(){
     local destino_local="/tmp/$archivo"
     local destino_hash="/tmp/${archivo}.sha256"
 
-    # Descargar binario
-    echo -e "\n${Y}Descargando $archivo...${W}"
+    echo -e "\nDescargando $archivo..."
     curl -s -u "$ftp_user:$ftp_pass" \
          "ftp://$FTP_IP$ruta_svc/$archivo" -o "$destino_local"
     if [ $? -ne 0 ] || [ ! -f "$destino_local" ]; then
-        echo -e "${R}Error al descargar $archivo${W}"
+        echo "Error al descargar $archivo"
         read -p "PRESIONE ENTER PARA VOLVER"; return
     fi
 
-    echo -e "${Y}Verificando integridad SHA256...${W}"
+    echo "Verificando integridad SHA256..."
     curl -s -u "$ftp_user:$ftp_pass" \
          "ftp://$FTP_IP$ruta_svc/${archivo}.sha256" -o "$destino_hash"
 
     if [ ! -f "$destino_hash" ]; then
-        echo -e "${R}No se encontró el .sha256. Abortando.${W}"
+        echo "No se encontró el .sha256. Abortando."
         read -p "PRESIONE ENTER PARA VOLVER"; return
     fi
 
@@ -325,11 +321,11 @@ instalar_desde_ftp(){
     hash_real=$(sha256sum "$destino_local" | awk '{print $1}')
 
     if [ "$hash_real" != "$hash_esperado" ]; then
-        echo -e "${R}⚠ INTEGRIDAD FALLIDA — Archivo CORRUPTO. Se elimina.${W}"
+        echo "⚠ INTEGRIDAD FALLIDA — Archivo CORRUPTO. Se elimina."
         rm -f "$destino_local" "$destino_hash"
         read -p "PRESIONE ENTER PARA VOLVER"; return
     fi
-    echo -e "${G}✓ Hash verificado correctamente.${W}"
+    echo "✓ Hash verificado correctamente."
 
     local pkg
     case $svc_dir in
@@ -340,12 +336,12 @@ instalar_desde_ftp(){
     esac
 
     if dpkg -l "$pkg" 2>/dev/null | grep -q '^ii'; then
-        echo -e "${G}$pkg ya está instalado.${W}"
+        echo "$pkg ya está instalado."
     else
-        echo -e "\n${Y}Instalando $archivo...${W}"
+        echo -e "\nInstalando $archivo..."
         sudo DEBIAN_FRONTEND=noninteractive dpkg -i "$destino_local" 2>/dev/null
         sudo apt-get install -f -y > /dev/null
-        echo -e "${G}✓ $svc_dir instalado correctamente.${W}"
+        echo "✓ $svc_dir instalado correctamente."
     fi
 
     local puerto
@@ -362,7 +358,7 @@ instalar_desde_ftp(){
             configurar_firewall_linux "$puerto"
             configurar_firewall_ssl "apache2"
             sudo systemctl restart apache2
-            echo -e "${G}Apache2 listo en puerto $puerto${W}"
+            echo "Apache2 listo en puerto $puerto"
             ;;
         Nginx)
             while true; do read -rp "Puerto para Nginx: " puerto; validar_puerto "$puerto" && break; done
@@ -379,7 +375,7 @@ instalar_desde_ftp(){
             configurar_firewall_ssl "nginx"
             sudo rm -f /etc/nginx/sites-enabled/default
             sudo systemctl restart nginx
-            echo -e "${G}Nginx listo en puerto $puerto${W}"
+            echo "Nginx listo en puerto $puerto"
             ;;
         Tomcat)
             while true; do read -rp "Puerto para Tomcat: " puerto; validar_puerto "$puerto" && break; done
@@ -391,11 +387,11 @@ instalar_desde_ftp(){
             configurar_firewall_linux "$puerto"
             configurar_firewall_ssl "tomcat9"
             sudo systemctl restart tomcat9
-            echo -e "${G}Tomcat listo en puerto $puerto${W}"
+            echo "Tomcat listo en puerto $puerto"
             ;;
         vsftpd)
             servicios
-            echo -e "${G}vsftpd instalado y configurado.${W}"
+            echo "vsftpd instalado y configurado."
             ;;
     esac
 
@@ -421,13 +417,13 @@ _configurar_ssl_servicio(){
     local cert="$SSL_DIR/${servicio}.crt"
     local key="$SSL_DIR/${servicio}.key"
 
-    echo -e "${Y}Generando certificado autofirmado para $DOMAIN...${W}"
+    echo "Generando certificado autofirmado para $DOMAIN..."
     sudo openssl req -x509 -nodes -days 365 \
         -newkey rsa:2048 \
         -keyout "$key" -out "$cert" \
         -subj "/C=MX/ST=Sinaloa/L=LosMochis/O=Practica7/CN=www.$DOMAIN" \
-        2>/dev/null && echo -e "${G}✓ Certificado generado${W}" \
-                    || { echo -e "${R}Error generando certificado${W}"; return 1; }
+        2>/dev/null && echo "✓ Certificado generado" \
+                    || { echo "Error generando certificado"; return 1; }
 
     case $servicio in
         apache2) _ssl_apache  "$cert" "$key" ;;
@@ -473,8 +469,8 @@ EOF
     sudo a2ensite ssl-practica7 > /dev/null 2>&1
     sudo systemctl restart apache2
     sudo systemctl is-active --quiet apache2 \
-        && echo -e "${G}✓ Apache2 SSL activo en puerto 443${W}" \
-        || { echo -e "${R}✗ Error en Apache2${W}"; sudo apache2ctl -t 2>&1 | tail -5; }
+        && echo "✓ Apache2 SSL activo en puerto 443" \
+        || { echo "✗ Error en Apache2"; sudo apache2ctl -t 2>&1 | tail -5; }
 }
 
 _ssl_nginx(){
@@ -513,8 +509,8 @@ EOF
     sudo rm -f /etc/nginx/sites-enabled/default
     sudo systemctl restart nginx
     sudo systemctl is-active --quiet nginx \
-        && echo -e "${G}✓ Nginx SSL activo HTTP:$puerto_http HTTPS:$puerto_https${W}" \
-        || { echo -e "${R}✗ Error en Nginx${W}"; sudo nginx -t 2>&1 | tail -5; }
+        && echo "✓ Nginx SSL activo HTTP:$puerto_http HTTPS:$puerto_https" \
+        || { echo "✗ Error en Nginx"; sudo nginx -t 2>&1 | tail -5; }
 }
 
 _ssl_tomcat(){
@@ -535,10 +531,12 @@ _ssl_tomcat(){
         </SSLHostConfig>\\
     </Connector>" /etc/tomcat9/server.xml
     fi
+    sudo chown root:tomcat "$keystore"
+    sudo chmod 640 "$keystore"
     sudo systemctl restart tomcat9
     sudo systemctl is-active --quiet tomcat9 \
-        && echo -e "${G}✓ Tomcat SSL activo en puerto 8443${W}" \
-        || echo -e "${R}✗ Error en Tomcat${W}"
+        && echo "✓ Tomcat SSL activo en puerto 8443" \
+        || echo "✗ Error en Tomcat"
 }
 
 _ssl_vsftpd(){
@@ -563,9 +561,10 @@ ssl_ciphers=HIGH
 EOF
     sudo systemctl restart vsftpd
     sudo systemctl is-active --quiet vsftpd \
-        && echo -e "${G}✓ vsftpd FTPS activo${W}" \
-        || echo -e "${R}✗ Error en vsftpd${W}"
+        && echo "✓ vsftpd FTPS activo" \
+        || echo "✗ Error en vsftpd"
 }
+
 archivos
 servicios
 sudo ufw allow 21/tcp
@@ -576,17 +575,15 @@ sudo ufw reload
 
 while true; do
     clear
-    echo -e "${B}╔══════════════════════════════════════════╗${W}"
-    echo -e "${B}║         SERVIDOR FTP — PRÁCTICA 7        ║${W}"
-    echo -e "${B}╚══════════════════════════════════════════╝${W}"
+    echo "         SERVIDOR FTP CON ESTEROIDES      "
     echo ""
-    echo -e "  ${C}1)${W} Instalar vsftpd"
-    echo -e "  ${C}2)${W} Estado del servicio"
-    echo -e "  ${C}3)${W} Agregar usuarios"
-    echo -e "  ${C}4)${W} Reubicar usuario"
-    echo -e "  ${C}5)${W} Preparar repositorio de servidores"
-    echo -e "  ${C}6)${W} Instalar servidor desde FTP"
-    echo -e "  ${C}7)${W} Salir"
+    echo "  1) Instalar vsftpd"
+    echo "  2) Estado del servicio"
+    echo "  3) Agregar usuarios"
+    echo "  4) Reubicar usuario"
+    echo "  5) Preparar repositorio de servidores"
+    echo "  6) Instalar servidor desde FTP"
+    echo "  7) Salir"
     echo ""
     read -p "  OPCION: " opc
     case $opc in

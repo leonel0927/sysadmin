@@ -8,7 +8,8 @@ echo "--SELECCIONE UNA OPCION:"
     echo "3) SSH"
     echo "4) FTP"
     echo "5) HTTP"
-    echo "6) Salir"
+    echo "6) Practica 7"
+    echo "7) Salir"
     read -p "SELECCIONE UNA OPCION: " opcion
     case $opcion in
     1)bash ./dhcp.sh ;;
@@ -16,7 +17,8 @@ echo "--SELECCIONE UNA OPCION:"
     3)bash ./ssh.sh ;;
     4)bash ./ftp.sh ;;
     5)bash ./http.sh ;;
-    6) echo "Saliendo.."
+    6)bash ./practica7.sh ;;
+    7) echo "Saliendo.."
         exit 0 ;;
     *) 
         echo "Opcion no válida."

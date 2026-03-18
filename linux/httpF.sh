@@ -2,9 +2,7 @@
 source /home/srv-linux-server/SCRIPS2/FUNCIONES/status.sh
 
 listar_puertos_activos() {
-    echo "==============================================="
     echo "   ESTADO DE PUERTOS Y SERVIDORES HTTP"
-    echo "==============================================="
     echo -e "PROTO\tPUERTO\tSERVICIO\tPROCESO"
     echo "-----------------------------------------------"
     sudo ss -tulpn | grep -E 'apache2|nginx|java' | awk '{
@@ -41,9 +39,7 @@ validar_puerto() {
 
 consultar_versiones_dinamico() {
     local servicio=$1
-    echo "==============================================="
     echo " ANALIZANDO REPOSITORIOS PARA: $servicio"
-    echo "==============================================="
     echo "Estado actual del paquete: "
     apt-cache policy "$servicio" | grep -E "Instalados:|Candidato:"
     echo "-----------------------------------------------"
@@ -65,7 +61,6 @@ consultar_versiones_dinamico() {
     echo "-----------------------------------------------"
 }
 
-# Nueva funcion: muestra versiones y retorna la elegida
 seleccionar_version() {
     local servicio=$1
 
@@ -109,6 +104,7 @@ seleccionar_version() {
         esac
     done
 }
+
 seleccionar_version_tomcat() {
     echo "Consultando versiones disponibles de Tomcat 9..." >&2
 
@@ -163,16 +159,16 @@ configurar_firewall_linux() {
     sudo ufw allow "$puerto"/tcp > /dev/null
     echo "y" | sudo ufw enable > /dev/null
 }
+
 configurar_firewall_ssl() {
     local servicio=$1
     echo "Configurando UFW para SSL/TLS ($servicio)..."
-    sudo ufw allow 443/tcp  > /dev/null   # HTTPS Apache / Nginx
-    sudo ufw allow 8443/tcp > /dev/null   # HTTPS Tomcat
-    sudo ufw allow 990/tcp  > /dev/null   # FTPS implícito
+    sudo ufw allow 443/tcp  > /dev/null   
+    sudo ufw allow 8443/tcp > /dev/null  
+    sudo ufw allow 990/tcp  > /dev/null  
     sudo ufw reload > /dev/null
     echo "  → Puertos 443, 8443 y 990 abiertos en UFW"
 }
-# ─────────────────────────────────────────────────────────────
 
 aplicar_hardening_linux() {
     local servicio=$1
@@ -220,7 +216,6 @@ generar_index_personalizado() {
             fi
             ;;
     esac
-    # ─────────────────────────────────────────────────────────
 
     echo "Generando página en $ruta_web/index.html..."
     sudo mkdir -p "$ruta_web"
@@ -240,7 +235,7 @@ generar_index_personalizado() {
 </head>
 <body>
     <div class="card">
-        <h1>HTTP</h1>
+        <h1>Control de Despliegue HTTP</h1>
         <p><strong>Servidor:</strong> <span class="success">$servicio</span></p>
         <p><strong>Versión:</strong> $version</p>
         <p><strong>Puerto:</strong> $puerto</p>
@@ -277,6 +272,7 @@ instalar_apache() {
     configurar_permisos_usuario "www-data" "$ruta_web"
     configurar_firewall_linux "$puerto"
     configurar_firewall_ssl "apache2"
+
     if ! sudo systemctl restart apache2; then
         echo "Error: Apache no pudo iniciar. Verificando logs..."
         sudo apache2ctl -t
@@ -336,6 +332,7 @@ instalar_tomcat() {
 
     configurar_firewall_linux "$puerto"
     configurar_firewall_ssl "tomcat9"
+    
 
     sudo systemctl restart tomcat9
     if sudo systemctl is-active --quiet tomcat9; then

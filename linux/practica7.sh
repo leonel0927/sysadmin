@@ -1,13 +1,14 @@
 #!/bin/bash
-
 SCRIPT_DIR="/home/srv-linux-server/SCRIPS2"
+
 source "$SCRIPT_DIR/FUNCIONES/instalacion.sh" 2>/dev/null
 source "$SCRIPT_DIR/FUNCIONES/status.sh"      2>/dev/null
 source "$SCRIPT_DIR/linux/httpF.sh"           2>/dev/null
+
 _cargar_funciones_ftp() {
     local ftp_script="$SCRIPT_DIR/linux/ftp.sh"
     if [ ! -f "$ftp_script" ]; then
-        echo -e "${R}[WARN] No se encontró $ftp_script — funciones FTP no disponibles${W}"
+        echo "[WARN] No se encontró $ftp_script — funciones FTP no disponibles"
         return 1
     fi
     SOLO_FUNCIONES=1 source "$ftp_script"
@@ -20,17 +21,16 @@ SSL_DIR="/etc/ssl/practica7"
 DOMAIN="reprobados.com"
 LOG_RESUMEN="/tmp/practica7_resumen.log"
 
-R='\033[0;31m'; G='\033[0;32m'; Y='\033[1;33m'
-B='\033[0;34m'; C='\033[0;36m'; W='\033[0m'
 titulo() {
-    echo -e "\n${B}══════════════════════════════════════${W}"
-    echo -e "${C}  $1${W}"
-    echo -e "${B}══════════════════════════════════════${W}"
+    echo -e "\n══════════════════════════════════════"
+    echo "  $1"
+    echo "══════════════════════════════════════"
 }
-pausa()   { echo -e "\nPresione ${Y}ENTER${W} para continuar..."; read -r; }
-log_ok()  { echo -e "${G}[OK]${W}  $1"; echo "[OK]  $1" >> "$LOG_RESUMEN"; }
-log_err() { echo -e "${R}[ERR]${W} $1"; echo "[ERR] $1" >> "$LOG_RESUMEN"; }
-log_inf() { echo -e "${Y}[INF]${W} $1"; echo "[INF] $1" >> "$LOG_RESUMEN"; }
+pausa()   { echo -e "\nPresione ENTER para continuar..."; read -r; }
+log_ok()  { echo "[OK]  $1"; echo "[OK]  $1" >> "$LOG_RESUMEN"; }
+log_err() { echo "[ERR] $1"; echo "[ERR] $1" >> "$LOG_RESUMEN"; }
+log_inf() { echo "[INF] $1"; echo "[INF] $1" >> "$LOG_RESUMEN"; }
+
 
 gestionar_usuarios_ftp() {
     titulo "GESTIÓN DE USUARIOS FTP"
@@ -45,6 +45,7 @@ gestionar_usuarios_ftp() {
         *) echo "Opción inválida"; sleep 1 ;;
     esac
 }
+
 orquestar_instalacion() {
     titulo "ORQUESTADOR DE INSTALACIÓN"
 
@@ -54,7 +55,7 @@ orquestar_instalacion() {
     read -rp "Opción: " fuente
 
     if [[ "$fuente" == "2" ]]; then
-        echo -e "\n${Y}Redirigiendo al módulo FTP...${W}"
+        echo -e "\nRedirigiendo al módulo FTP..."
         source "$SCRIPT_DIR/linux/ftp.sh"
         instalar_desde_ftp
         return
@@ -77,16 +78,14 @@ orquestar_instalacion() {
         *) echo "Inválido"; sleep 1; return ;;
     esac
 
-    # Verificar si ya está instalado
     if dpkg -l "$servicio" 2>/dev/null | grep -q '^ii'; then
-        echo -e "${G}$servicio ya está instalado.${W}"
+        echo "$servicio ya está instalado."
         read -rp "¿Desea reconfigurar el puerto/DocumentRoot? [S/N]: " reconf
         [[ "${reconf^^}" == "S" ]] && _configurar_servicio "$servicio" "$sel_svc"
     else
         _instalar_desde_web "$servicio" "$sel_svc"
     fi
 
-    # Preguntar SSL al terminar
     echo ""
     read -rp "¿Desea activar SSL/TLS en $servicio? [S/N]: " activar_ssl
     [[ "${activar_ssl^^}" == "S" ]] && configurar_ssl "$servicio"
@@ -126,7 +125,7 @@ _configurar_servicio() {
             log_ok "Tomcat reconfigurado en puerto $puerto"
             ;;
         4)
-            echo -e "${Y}Reaplicando configuración vsftpd...${W}"
+            echo "Reaplicando configuración vsftpd..."
             servicios
             log_ok "vsftpd reconfigurado"
             ;;
@@ -158,7 +157,7 @@ _instalar_desde_web() {
         4)
             sudo DEBIAN_FRONTEND=noninteractive apt-get install -y vsftpd > /dev/null
             servicios
-            echo -e "${G}vsftpd instalado y configurado.${W}"
+            echo "vsftpd instalado y configurado."
             ;;
     esac
 }
@@ -170,7 +169,7 @@ configurar_ssl() {
     local cert="$SSL_DIR/${servicio}.crt"
     local key="$SSL_DIR/${servicio}.key"
 
-    echo -e "${Y}Generando certificado autofirmado para $DOMAIN...${W}"
+    echo "Generando certificado autofirmado para $DOMAIN..."
     sudo openssl req -x509 -nodes -days 365 \
         -newkey rsa:2048 \
         -keyout "$key" \
@@ -189,13 +188,13 @@ configurar_ssl() {
         nginx)    _ssl_nginx   "$cert" "$key" ;;
         tomcat9)  _ssl_tomcat  "$cert" "$key" ;;
         vsftpd)   _ssl_vsftpd  "$cert" "$key" ;;
-        *)        echo -e "${R}Servicio no reconocido para SSL.${W}" ;;
+        *)        echo "Servicio no reconocido para SSL." ;;
     esac
 }
 
 _ssl_apache() {
     local cert=$1 key=$2
-    echo -e "${Y}Configurando SSL en Apache2...${W}"
+    echo "Configurando SSL en Apache2..."
 
     sudo a2enmod ssl headers rewrite > /dev/null 2>&1
 
@@ -217,6 +216,7 @@ _ssl_apache() {
     Header always set X-Content-Type-Options "nosniff"
 </VirtualHost>
 EOF
+
     if ! grep -q "RewriteRule.*https" /etc/apache2/sites-available/000-default.conf 2>/dev/null; then
         sudo bash -c "cat >> /etc/apache2/sites-available/000-default.conf" <<'EOF'
 
@@ -241,7 +241,8 @@ EOF
 
 _ssl_nginx() {
     local cert=$1 key=$2
-    echo -e "${Y}Configurando SSL en Nginx...${W}"
+    echo "Configurando SSL en Nginx..."
+
     local puerto_http
     puerto_http=$(grep -rh "listen [0-9]" /etc/nginx/sites-available/default \
                   /etc/nginx/sites-available/ssl-practica7 2>/dev/null \
@@ -249,7 +250,8 @@ _ssl_nginx() {
     [[ -z "$puerto_http" ]] && puerto_http=8081
     local puerto_https=$(( puerto_http + 363 ))
 
-    echo -e "${Y}  Nginx usara HTTP:$puerto_http  HTTPS:$puerto_https${W}"
+    echo "  Nginx usara HTTP:$puerto_http  HTTPS:$puerto_https"
+
     sudo sed -i "s/listen [0-9]\+ default_server;/listen $puerto_http default_server;/g" \
         /etc/nginx/sites-available/default 2>/dev/null
     sudo sed -i "s/listen \[::\]:[0-9]\+ default_server;/listen [::]:$puerto_http default_server;/g" \
@@ -297,7 +299,7 @@ EOF
 
 _ssl_tomcat() {
     local cert=$1 key=$2
-    echo -e "${Y}Configurando SSL en Tomcat...${W}"
+    echo "Configurando SSL en Tomcat..."
 
     local tomcat_conf="/etc/tomcat9/server.xml"
     local keystore="$SSL_DIR/tomcat.p12"
@@ -343,7 +345,7 @@ _ssl_tomcat() {
 
 _ssl_vsftpd() {
     local cert=$1 key=$2
-    echo -e "${Y}Configurando FTPS (SSL) en vsftpd...${W}"
+    echo "Configurando FTPS (SSL) en vsftpd..."
 
     sudo sed -i '/^ssl_enable/d; /^rsa_cert_file/d; /^rsa_private_key_file/d
                  /^ssl_tlsv1/d; /^ssl_sslv2/d; /^ssl_sslv3/d
@@ -379,20 +381,21 @@ ssl_masivo() {
     local SERVICIOS=("apache2" "nginx" "tomcat9" "vsftpd")
     for svc in "${SERVICIOS[@]}"; do
         if dpkg -l "$svc" 2>/dev/null | grep -q '^ii'; then
-            echo -e "\n${C}--- $svc ---${W}"
+            echo -e "\n--- $svc ---"
             read -rp "¿Activar SSL en $svc? [S/N]: " resp
             [[ "${resp^^}" == "S" ]] && configurar_ssl "$svc"
         else
-            echo -e "${Y}[OMITIDO] $svc no está instalado.${W}"
+            echo "[OMITIDO] $svc no está instalado."
         fi
     done
     pausa
 }
+
 mostrar_resumen() {
     titulo "RESUMEN DE VERIFICACIÓN AUTOMÁTICA"
     : > "$LOG_RESUMEN"
 
-    echo -e "${B}═══ ESTADO DE SERVICIOS ═══${W}"
+    echo "═══ ESTADO DE SERVICIOS ═══"
     for svc in apache2 nginx tomcat9 vsftpd; do
         if sudo systemctl is-active --quiet "$svc" 2>/dev/null; then
             log_ok "$svc — ACTIVO"
@@ -403,13 +406,14 @@ mostrar_resumen() {
         fi
     done
 
-    echo -e "\n${B}═══ VERIFICACIÓN SSL/TLS ═══${W}"
+    echo -e "\n═══ VERIFICACIÓN SSL/TLS ═══"
+
     local apache_activo=false nginx_activo=false
     sudo systemctl is-active --quiet apache2 2>/dev/null && apache_activo=true
     sudo systemctl is-active --quiet nginx   2>/dev/null && nginx_activo=true
     if $apache_activo && $nginx_activo; then
         log_err "CONFLICTO: Apache2 y Nginx están activos al mismo tiempo en puerto 443"
-        echo -e "    ${Y}→ Solo uno puede escuchar en 443. Detenga uno antes de activar SSL.${W}"
+        echo "    → Solo uno puede escuchar en 443. Detenga uno antes de activar SSL."
     fi
     for puerto in 443; do
         local resultado
@@ -438,7 +442,7 @@ mostrar_resumen() {
                        || log_err "Puerto 21 FTPS: Sin cifrado detectado"
     fi
 
-    echo -e "\n${B}═══ CERTIFICADOS GENERADOS ═══${W}"
+    echo -e "\n═══ CERTIFICADOS GENERADOS ═══"
     if [ -d "$SSL_DIR" ]; then
         for crt in "$SSL_DIR"/*.crt; do
             [ -f "$crt" ] || continue
@@ -451,27 +455,24 @@ mostrar_resumen() {
         log_inf "No se han generado certificados aún."
     fi
 
-    echo -e "\n${B}═══ PUERTOS ACTIVOS ═══${W}"
+    echo -e "\n═══ PUERTOS ACTIVOS ═══"
     sudo ss -tulpn | grep -E ':80|:443|:21|:8443|:8080|:990' \
     | awk '{split($5,a,":"); print "  Puerto " a[length(a)] " — " $1 " — " $7}' \
     | sort -t' ' -k2 -n | uniq
 
-    echo -e "\n${G}Resumen guardado en: $LOG_RESUMEN${W}"
+    echo -e "\nResumen guardado en: $LOG_RESUMEN"
     pausa
 }
 while true; do
     clear
-    echo -e "${B}╔══════════════════════════════════════════╗${W}"
-    echo -e "${B}║   PRÁCTICA 7 — Orquestador Linux         ║${W}"
-    echo -e "${B}║   SSL/TLS + FTP Dinámico + Integridad     ║${W}"
-    echo -e "${B}╚══════════════════════════════════════════╝${W}"
+    echo " ********** PRÁCTICA 7 ********* "
     echo ""
-    echo -e "  ${C}1)${W} Instalar servicio vía WEB  (apt)"
-    echo -e "  ${C}2)${W} Instalar servicio vía FTP  (repositorio privado)"
-    echo -e "  ${C}3)${W} Activar SSL/TLS en todos los servicios"
-    echo -e "  ${C}4)${W} Activar SSL/TLS en un servicio específico"
-    echo -e "  ${C}5)${W} Resumen y verificación automática"
-    echo -e "  ${C}6)${W} Salir"
+    echo "  1) Instalar servicio vía WEB  (apt)"
+    echo "  2) Instalar servicio vía FTP  (repositorio privado)"
+    echo "  3) Activar SSL/TLS en todos los servicios"
+    echo "  4) Activar SSL/TLS en un servicio específico"
+    echo "  5) Resumen y verificación automática"
+    echo "  6) Salir"
     echo ""
     read -rp "  OPCIÓN: " opc
 
@@ -489,7 +490,7 @@ while true; do
                 *) echo "Inválido"; sleep 1; continue ;;
             esac
             if dpkg -l "$servicio" 2>/dev/null | grep -q '^ii'; then
-                echo -e "${G}$servicio ya está instalado.${W}"
+                echo "$servicio ya está instalado."
                 read -rp "¿Reconfigurar puerto? [S/N]: " reconf
                 [[ "${reconf^^}" == "S" ]] && _configurar_servicio "$servicio" "$sel_svc"
             else
@@ -518,7 +519,7 @@ while true; do
             pausa
             ;;
         5) mostrar_resumen ;;
-        6) echo -e "${G}Saliendo...${W}"; exit 0 ;;
+        6) echo "Saliendo..."; exit 0 ;;
         *) echo "Opción no válida"; sleep 1 ;;
     esac
 done
