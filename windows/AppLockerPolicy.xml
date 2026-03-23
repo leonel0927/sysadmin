@@ -1,0 +1,40 @@
+﻿<AppLockerPolicy Version="1">
+  <RuleCollection Type="Exe" EnforcementMode="Enabled">
+
+    <FilePathRule Id="fd686d83-a829-4351-8ff4-27c7de5755d2"
+                  Name="Permitir todo a Administradores"
+                  Description=""
+                  UserOrGroupSid="S-1-5-32-544"
+                  Action="Allow">
+      <Conditions>
+        <FilePathCondition Path="%WINDIR%\*"/>
+      </Conditions>
+    </FilePathRule>
+
+    <FilePathRule Id="a2e5b3c1-1234-4abc-8def-aabbccddeeff"
+                  Name="Cuates - Permitir Bloc de Notas"
+                  Description=""
+                  UserOrGroupSid="S-1-5-21-1238499175-2163441263-2397726022-1120"
+                  Action="Allow">
+      <Conditions>
+        <FilePathCondition Path="%SYSTEM32%\notepad.exe"/>
+      </Conditions>
+    </FilePathRule>
+
+    <FileHashRule Id="b3f6a2d4-5678-4bcd-9abc-000000000002"
+                  Name="NoCuates - Bloquear Bloc de Notas por Hash"
+                  Description=""
+                  UserOrGroupSid="S-1-5-21-1238499175-2163441263-2397726022-1121"
+                  Action="Deny">
+      <Conditions>
+        <FileHashCondition>
+          <FileHash Type="SHA256"
+                    Data="0x0C386FA6ABFDEFFBBEFF5BCE97D461340A23D1981458607BD9E5EEFF4066789A"
+                    SourceFileName="notepad.exe"
+                    SourceFileLength="201216"/>
+        </FileHashCondition>
+      </Conditions>
+    </FileHashRule>
+
+  </RuleCollection>
+</AppLockerPolicy>

@@ -1,22 +1,16 @@
-﻿# ============================================================
-#  httpF.ps1 -- Funciones HTTP + SSL para Windows Server
-#  Pr?ctica 7 -- No borrar nada, solo agregar
-# ============================================================
-
-function Validar-Puerto {
+﻿function Validar-Puerto {
     param ([int]$Puerto)
     $Reservados = @(21, 22, 23, 25, 53, 110, 143, 443, 445, 3306, 3389, 5432)
-
     if ($Puerto -lt 1 -or $Puerto -gt 65535) {
-        Write-Host "ERROR: Puerto fuera de rango valido (1-65535)." -ForegroundColor Red
+        Write-Host "ERROR: Puerto fuera de rango valido (1-65535)."
         return $false
     }
     if ($Reservados -contains $Puerto) {
-        Write-Host "ALERTA: El puerto $Puerto es critico/reservado. Elija otro." -ForegroundColor Red
+        Write-Host "ALERTA: El puerto $Puerto es critico/reservado. Elija otro."
         return $false
     }
     if (Get-NetTCPConnection -LocalPort $Puerto -ErrorAction SilentlyContinue) {
-        Write-Host "ERROR: El puerto $Puerto ya esta siendo usado." -ForegroundColor Red
+        Write-Host "ERROR: El puerto $Puerto ya esta siendo usado."
         return $false
     }
     return $true
@@ -24,7 +18,7 @@ function Validar-Puerto {
 
 function Obtener-Versiones-Choco {
     param ([string]$Paquete)
-    Write-Host "Consultando versiones de $Paquete en Chocolatey..." -ForegroundColor Cyan
+    Write-Host "Consultando versiones de $Paquete en Chocolatey..."
     $resultado = & choco search $Paquete --exact 2>$null
     $lineas = @()
     foreach ($linea in $resultado) {
@@ -38,7 +32,7 @@ function Obtener-Versiones-Choco {
         }
     }
     if ($lineas.Count -eq 0) {
-        Write-Host "No se encontraron versiones para '$Paquete'." -ForegroundColor Red
+        Write-Host "No se encontraron versiones para '$Paquete'."
         return $null
     }
     return $lineas
@@ -49,7 +43,7 @@ function Seleccionar-Version {
     $versiones = Obtener-Versiones-Choco -Paquete $Paquete
     if (-not $versiones) { return $null }
     Write-Host ""
-    Write-Host "Versiones disponibles para $Paquete`:" -ForegroundColor Yellow
+    Write-Host "Versiones disponibles para ${Paquete}:"
     for ($i = 0; $i -lt $versiones.Count; $i++) {
         $etiqueta = ""
         if ($i -eq 0)                      { $etiqueta = " [Latest/Development]" }
@@ -61,7 +55,7 @@ function Seleccionar-Version {
         $sel = $sel -replace '[^0-9]', ''
     } while ([string]::IsNullOrWhiteSpace($sel) -or [int]$sel -lt 1 -or [int]$sel -gt $versiones.Count)
     $versionElegida = $versiones[[int]$sel - 1]
-    Write-Host ">>> Version seleccionada: $versionElegida <<<" -ForegroundColor Green
+    Write-Host ">>> Version seleccionada: $versionElegida <<<"
     return $versionElegida
 }
 
@@ -93,12 +87,12 @@ function Crear-Pagina-Prueba {
 "@
     if (!(Test-Path $Ruta)) { New-Item -ItemType Directory -Path $Ruta -Force | Out-Null }
     $Contenido | Set-Content -Path "$Ruta\index.html" -Encoding UTF8
-    Write-Host "Pagina index.html creada en: $Ruta" -ForegroundColor Green
+    Write-Host "Pagina index.html creada en: $Ruta"
 }
 
 function Aplicar-Seguridad-IIS {
     param ([string]$SitioNombre = "Default Web Site")
-    Write-Host "Aplicando seguridad en IIS..." -ForegroundColor Cyan
+    Write-Host "Aplicando seguridad en IIS..."
     try {
         Remove-WebConfigurationProperty -PSPath "MACHINE/WEBROOT/APPHOST" `
             -Filter "system.webServer/httpProtocol/customHeaders" `
@@ -115,17 +109,17 @@ function Aplicar-Seguridad-IIS {
                 -Name "." -Value $h -ErrorAction SilentlyContinue
         } catch {}
     }
-    Write-Host "Seguridad IIS aplicada." -ForegroundColor Green
+    Write-Host "Seguridad IIS aplicada."
 }
 
 function Configurar-Firewall {
     param ([int]$Puerto, [string]$Servicio)
-    Write-Host "Configurando firewall para puerto $Puerto..." -ForegroundColor Cyan
+    Write-Host "Configurando firewall para puerto $Puerto..."
     Get-NetFirewallRule -DisplayName "HTTP-$Servicio-*" -ErrorAction SilentlyContinue | Remove-NetFirewallRule
     New-NetFirewallRule -DisplayName "HTTP-$Servicio-$Puerto" `
         -Direction Inbound -LocalPort $Puerto -Protocol TCP `
         -Action Allow -ErrorAction SilentlyContinue | Out-Null
-    Write-Host "Firewall: puerto $Puerto abierto." -ForegroundColor Green
+    Write-Host "Firewall: puerto $Puerto abierto."
 }
 
 function Crear-Usuario-Dedicado {
@@ -150,13 +144,13 @@ function Crear-Usuario-Dedicado {
 function Instalar-IIS {
     param ([int]$Puerto)
     $Version = "10.0 (Windows Server 2019)"
-    Write-Host "`n[IIS] Verificando instalacion..." -ForegroundColor Cyan
+    Write-Host "[IIS] Verificando instalacion..."
     $feature = Get-WindowsFeature Web-Server -ErrorAction SilentlyContinue
     if (-not $feature.Installed) {
         Install-WindowsFeature -Name Web-Server -IncludeManagementTools | Out-Null
         Install-WindowsFeature -Name Web-Security | Out-Null
     } else {
-        Write-Host "IIS ya instalado." -ForegroundColor Green
+        Write-Host "IIS ya instalado."
     }
     Import-Module WebAdministration -ErrorAction SilentlyContinue
     Stop-Service W3SVC -ErrorAction SilentlyContinue
@@ -166,14 +160,14 @@ function Instalar-IIS {
     Aplicar-Seguridad-IIS
     Configurar-Firewall -Puerto $Puerto -Servicio "IIS"
     Start-Service W3SVC -ErrorAction SilentlyContinue
-    Write-Host "[IIS] Desplegado en puerto $Puerto." -ForegroundColor Green
+    Write-Host "[IIS] Desplegado en puerto $Puerto."
     Pause
 }
 
 function Instalar-Apache {
     param ([int]$PuertoGeneral)
     $Version = Seleccionar-Version -Paquete "apache-httpd"
-    if (-not $Version) { Write-Host "No se pudo obtener version de Apache." -ForegroundColor Red; Pause; return }
+    if (-not $Version) { Write-Host "No se pudo obtener version de Apache."; Pause; return }
 
     $apacheRoot = Get-ChildItem "C:\tools" -Directory -ErrorAction SilentlyContinue |
                   Where-Object { $_.Name -match "(?i)^apache" -and (Test-Path "$($_.FullName)\bin\httpd.exe") } |
@@ -187,7 +181,7 @@ function Instalar-Apache {
         $apacheRoot = Get-ChildItem "C:\tools" -Directory -ErrorAction SilentlyContinue |
                       Where-Object { $_.Name -match "(?i)^apache" -and (Test-Path "$($_.FullName)\bin\httpd.exe") } |
                       Sort-Object LastWriteTime -Descending | Select-Object -First 1 -ExpandProperty FullName
-        if (-not $apacheRoot) { Write-Host "ERROR: No se encontro Apache." -ForegroundColor Red; Pause; return }
+        if (-not $apacheRoot) { Write-Host "ERROR: No se encontro Apache."; Pause; return }
     }
 
     $apacheRootEscaped = $apacheRoot -replace '\\', '/'
@@ -195,7 +189,6 @@ function Instalar-Apache {
     Stop-Process -Name httpd -Force -ErrorAction SilentlyContinue
     Start-Sleep -Seconds 2
 
-    # Generar certificado SSL
     $binPath = "$apacheRoot\bin"
     if (Test-Path "$binPath\openssl.exe") {
         $subject = "/C=MX/ST=Sinaloa/L=Mochis/O=Practica7/CN=www.reprobados.com"
@@ -235,14 +228,14 @@ function Instalar-Apache {
     elseif (Test-Path "$apacheRoot\bin\httpd.exe") {
         Start-Process "$apacheRoot\bin\httpd.exe" -WorkingDirectory "$apacheRoot\bin"
     }
-    Write-Host "[Apache] Desplegado con SSL en puerto $PuertoGeneral." -ForegroundColor Green
+    Write-Host "[Apache] Desplegado con SSL en puerto $PuertoGeneral."
     Pause
 }
 
 function Instalar-Nginx {
     param ([int]$Puerto)
     $Version = Seleccionar-Version -Paquete "nginx"
-    if (-not $Version) { Write-Host "No se pudo obtener version de Nginx." -ForegroundColor Red; Pause; return }
+    if (-not $Version) { Write-Host "No se pudo obtener version de Nginx."; Pause; return }
 
     Stop-Process -Name nginx -Force -ErrorAction SilentlyContinue
     Start-Sleep -Seconds 2
@@ -271,21 +264,29 @@ function Instalar-Nginx {
     if (Test-Path "$nginxRoot\nginx.exe") {
         Start-Process "$nginxRoot\nginx.exe" -WorkingDirectory $nginxRoot
     }
-    Write-Host "[Nginx] Desplegado en puerto $Puerto." -ForegroundColor Green
+    Write-Host "[Nginx] Desplegado en puerto $Puerto."
     Pause
 }
 
-# ============================================================
-#  NUEVO (Pr?ctica 7) -- Funciones SSL
-# ============================================================
+function Buscar-OpenSSL {
+    $candidatos = @(
+        "C:\Program Files\OpenSSL\bin\openssl.exe",
+        "C:\Program Files\OpenSSL-Win64\bin\openssl.exe"
+    )
+    $apacheRoot = Get-ChildItem "C:\tools" -Directory -ErrorAction SilentlyContinue |
+                  Where-Object { $_.Name -match "(?i)^apache" -and (Test-Path "$($_.FullName)\bin\openssl.exe") } |
+                  Select-Object -First 1 -ExpandProperty FullName
+    if ($apacheRoot) { $candidatos += "$apacheRoot\bin\openssl.exe" }
+    foreach ($c in $candidatos) {
+        if (Test-Path $c) { return $c }
+    }
+    return $null
+}
 
 function Generar-Certificado {
     param ([string]$CertPath, [string]$KeyPath)
     $domain = "www.reprobados.com"
-
-    # Intentar con makecert o New-SelfSignedCertificate
-    Write-Host "Generando certificado autofirmado para $domain..." -ForegroundColor Yellow
-
+    Write-Host "Generando certificado autofirmado para $domain..."
     $cert = New-SelfSignedCertificate `
         -DnsName $domain `
         -CertStoreLocation "Cert:\LocalMachine\My" `
@@ -293,37 +294,27 @@ function Generar-Certificado {
         -KeyAlgorithm RSA `
         -KeyLength 2048 `
         -HashAlgorithm SHA256
-
-    # Exportar .pfx
     $pfxPath = "C:\ssl\reprobados.pfx"
     if (-not (Test-Path "C:\ssl")) { New-Item -ItemType Directory -Path "C:\ssl" -Force | Out-Null }
-    $pwd = ConvertTo-SecureString "practica7" -AsPlainText -Force
-    Export-PfxCertificate -Cert $cert -FilePath $pfxPath -Password $pwd | Out-Null
-
-    Write-Host "Certificado generado: Thumbprint=$($cert.Thumbprint)" -ForegroundColor Green
+    $pwdSec = ConvertTo-SecureString "practica7" -AsPlainText -Force
+    Export-PfxCertificate -Cert $cert -FilePath $pfxPath -Password $pwdSec | Out-Null
+    Write-Host "Certificado generado: Thumbprint=$($cert.Thumbprint)"
     return $cert
 }
 
 function Configurar-SSL-IIS {
     param ([int]$Puerto = 443)
-    Write-Host "`n[SSL-IIS] Configurando HTTPS en puerto $Puerto..." -ForegroundColor Cyan
+    Write-Host "[SSL-IIS] Configurando HTTPS en puerto $Puerto..."
     Import-Module WebAdministration -ErrorAction SilentlyContinue
-
     $cert = Generar-Certificado -CertPath "C:\ssl\iis.crt" -KeyPath "C:\ssl\iis.key"
-    if (-not $cert) { Write-Host "ERROR: No se pudo generar certificado." -ForegroundColor Red; return }
-
-    # Agregar binding HTTPS
+    if (-not $cert) { Write-Host "ERROR: No se pudo generar certificado."; return }
     $sitio = "Default Web Site"
     $bindingExiste = Get-WebBinding -Name $sitio -Protocol "https" -Port $Puerto -ErrorAction SilentlyContinue
     if (-not $bindingExiste) {
         New-WebBinding -Name $sitio -Protocol "https" -Port $Puerto -IPAddress "*"
     }
-
-    # Asignar certificado al binding
     $binding = Get-WebBinding -Name $sitio -Protocol "https" -Port $Puerto
     $binding.AddSslCertificate($cert.Thumbprint, "My")
-
-    # Redirecci?n HTTP -> HTTPS en web.config
     $webConfig = "C:\inetpub\wwwroot\web.config"
     @"
 <?xml version="1.0" encoding="UTF-8"?>
@@ -348,34 +339,26 @@ function Configurar-SSL-IIS {
     </system.webServer>
 </configuration>
 "@ | Set-Content $webConfig -Encoding UTF8
-
     Configurar-Firewall -Puerto $Puerto -Servicio "IIS-HTTPS"
     Restart-Service W3SVC -ErrorAction SilentlyContinue
-    Write-Host "[SSL-IIS] HTTPS activo en puerto $Puerto." -ForegroundColor Green
+    Write-Host "[SSL-IIS] HTTPS activo en puerto $Puerto."
 }
 
 function Configurar-SSL-Apache {
     param ([int]$Puerto = 443)
-    Write-Host "`n[SSL-Apache] Configurando HTTPS en puerto $Puerto..." -ForegroundColor Cyan
-
+    Write-Host "[SSL-Apache] Configurando HTTPS en puerto $Puerto..."
     $apacheRoot = Get-ChildItem "C:\tools" -Directory -ErrorAction SilentlyContinue |
                   Where-Object { $_.Name -match "(?i)^apache" -and (Test-Path "$($_.FullName)\bin\httpd.exe") } |
                   Sort-Object LastWriteTime -Descending | Select-Object -First 1 -ExpandProperty FullName
-
-    if (-not $apacheRoot) { Write-Host "Apache no instalado." -ForegroundColor Red; return }
-
+    if (-not $apacheRoot) { Write-Host "Apache no instalado."; return }
     $apacheRootEscaped = $apacheRoot -replace '\\', '/'
     $binPath = "$apacheRoot\bin"
-
-    # Generar certificado con openssl de Apache
     if (Test-Path "$binPath\openssl.exe") {
         $subject = "/C=MX/ST=Sinaloa/L=Mochis/O=Practica7/CN=www.reprobados.com"
         Start-Process "$binPath\openssl.exe" `
             -ArgumentList "req -config ..\conf\openssl.cnf -new -x509 -days 365 -nodes -subj `"$subject`" -keyout ..\conf\server.key -out ..\conf\server.crt" `
             -WorkingDirectory $binPath -Wait -WindowStyle Hidden
     }
-
-    # Configurar SSL en httpd-ssl.conf
     $sslConfPath = "$apacheRoot\conf\extra\httpd-ssl.conf"
     if (Test-Path $sslConfPath) {
         $sslConf = Get-Content $sslConfPath
@@ -385,189 +368,161 @@ function Configurar-SSL-Apache {
         $sslConf = $sslConf -replace 'SSLCertificateKeyFile.*', "SSLCertificateKeyFile `"$apacheRootEscaped/conf/server.key`""
         $sslConf | Set-Content $sslConfPath
     }
-
     Configurar-Firewall -Puerto $Puerto -Servicio "Apache-HTTPS"
     Stop-Service Apache2.4 -ErrorAction SilentlyContinue
     Stop-Process -Name httpd -Force -ErrorAction SilentlyContinue
     Start-Sleep -Seconds 2
     Start-Process "$apacheRoot\bin\httpd.exe" -WorkingDirectory "$apacheRoot\bin"
-    Write-Host "[SSL-Apache] HTTPS activo en puerto $Puerto." -ForegroundColor Green
+    Write-Host "[SSL-Apache] HTTPS activo en puerto $Puerto."
 }
 
 function Configurar-SSL-Nginx {
     param ([int]$Puerto = 8443)
-    Write-Host "`n[SSL-Nginx] Configurando HTTPS en puerto $Puerto..." -ForegroundColor Cyan
+    Write-Host "[SSL-Nginx] Configurando HTTPS en puerto $Puerto..."
 
     $nginxRoot = Get-ChildItem "C:\tools" -Directory -ErrorAction SilentlyContinue |
                  Where-Object { $_.Name -match "^nginx" -and (Test-Path "$($_.FullName)\nginx.exe") } |
                  Sort-Object LastWriteTime -Descending | Select-Object -First 1 -ExpandProperty FullName
+    if (-not $nginxRoot) { Write-Host "Nginx no instalado."; return }
 
-    if (-not $nginxRoot) { Write-Host "Nginx no instalado." -ForegroundColor Red; return }
+    # Detectar puerto HTTP actual
+    $confPath = "$nginxRoot\conf\nginx.conf"
+    $puertoHTTP = 8085
+    if (Test-Path $confPath) {
+        $confActual = Get-Content $confPath -Raw
+        $matches2 = [regex]::Matches($confActual, "listen (\d+);")
+        foreach ($m in $matches2) {
+            $p = [int]$m.Groups[1].Value
+            if ($p -ne $Puerto -and $p -ne 443 -and $p -ne 80) {
+                $puertoHTTP = $p; break
+            }
+        }
+    }
 
-    # Generar certificado con PowerShell
     if (-not (Test-Path "$nginxRoot\conf\ssl")) {
         New-Item -ItemType Directory -Path "$nginxRoot\conf\ssl" -Force | Out-Null
     }
 
+    # Generar certificado exportable
     $cert = New-SelfSignedCertificate `
         -DnsName "www.reprobados.com" `
         -CertStoreLocation "Cert:\LocalMachine\My" `
-        -NotAfter (Get-Date).AddDays(365)
+        -NotAfter (Get-Date).AddDays(365) `
+        -KeyExportPolicy Exportable `
+        -KeySpec Signature
 
-    $pwd = ConvertTo-SecureString "practica7" -AsPlainText -Force
+    $pwdSec = ConvertTo-SecureString "practica7" -AsPlainText -Force
     $pfxPath = "$nginxRoot\conf\ssl\nginx.pfx"
-    Export-PfxCertificate -Cert $cert -FilePath $pfxPath -Password $pwd | Out-Null
+    Export-PfxCertificate -Cert $cert -FilePath $pfxPath -Password $pwdSec | Out-Null
 
-    # Exportar como PEM para nginx
     $crtPath = "$nginxRoot\conf\ssl\nginx.crt"
     $keyPath = "$nginxRoot\conf\ssl\nginx.key"
 
-    # Usar openssl de Apache si est? disponible
-    $apacheRoot = Get-ChildItem "C:\tools" -Directory -ErrorAction SilentlyContinue |
-                  Where-Object { $_.Name -match "(?i)^apache" -and (Test-Path "$($_.FullName)\bin\openssl.exe") } |
-                  Select-Object -First 1 -ExpandProperty FullName
-
-    if ($apacheRoot) {
-        $opensslExe = "$apacheRoot\bin\openssl.exe"
-        Start-Process $opensslExe -ArgumentList "pkcs12 -in `"$pfxPath`" -clcerts -nokeys -out `"$crtPath`" -passin pass:practica7" -Wait -WindowStyle Hidden
-        Start-Process $opensslExe -ArgumentList "pkcs12 -in `"$pfxPath`" -nocerts -nodes -out `"$keyPath`" -passin pass:practica7" -Wait -WindowStyle Hidden
+    # Buscar OpenSSL
+    $opensslExe = Buscar-OpenSSL
+    if (-not $opensslExe) {
+        Write-Host "OpenSSL no encontrado. Instalando..."
+        choco install openssl.light -y --no-progress
+        $opensslExe = Buscar-OpenSSL
+    }
+    if (-not $opensslExe) {
+        Write-Host "ERROR: No se pudo encontrar OpenSSL."
+        return
     }
 
-    # Configurar nginx.conf con SSL
-    $confPath = "$nginxRoot\conf\nginx.conf"
-    $nginxRootEscaped = $nginxRoot -replace '\\', '/'
-    $crtEscaped = $crtPath -replace '\\', '/'
-    $keyEscaped = $keyPath -replace '\\', '/'
+    & $opensslExe pkcs12 -in "$pfxPath" -clcerts -nokeys -out "$crtPath" -passin pass:practica7 2>$null
+    & $opensslExe pkcs12 -in "$pfxPath" -nocerts -nodes -out "$keyPath" -passin pass:practica7 2>$null
+    Write-Host "Certificados exportados con OpenSSL."
 
-    $confContent = @"
-worker_processes  1;
-events { worker_connections  1024; }
-http {
-    include       mime.types;
-    default_type  application/octet-stream;
-    sendfile        on;
-    keepalive_timeout  65;
+    $nginxRootE = $nginxRoot -replace '\\', '/'
+    $crtE = $crtPath -replace '\\', '/'
+    $keyE = $keyPath -replace '\\', '/'
 
-    # HTTP -> HTTPS redirect
-    server {
-        listen 80;
-        server_name www.reprobados.com;
-        return 301 https://`$host:`$server_port`$request_uri;
-    }
+    $confNuevo = "worker_processes  1;`r`nevents { worker_connections  1024; }`r`nhttp {`r`n    include       mime.types;`r`n    default_type  application/octet-stream;`r`n    sendfile        on;`r`n    keepalive_timeout  65;`r`n    server {`r`n        listen $puertoHTTP;`r`n        server_name www.reprobados.com;`r`n        return 301 https://`$host:$Puerto`$request_uri;`r`n    }`r`n    server {`r`n        listen $Puerto ssl;`r`n        server_name www.reprobados.com;`r`n        ssl_certificate     $crtE;`r`n        ssl_certificate_key $keyE;`r`n        ssl_protocols       TLSv1.2 TLSv1.3;`r`n        ssl_ciphers         HIGH:!aNULL:!MD5;`r`n        root   $nginxRootE/html;`r`n        index  index.html;`r`n        add_header Strict-Transport-Security `"max-age=31536000`" always;`r`n        add_header X-Frame-Options `"SAMEORIGIN`" always;`r`n        add_header X-Content-Type-Options `"nosniff`" always;`r`n    }`r`n}`r`n"
 
-    server {
-        listen $Puerto ssl;
-        server_name www.reprobados.com;
-
-        ssl_certificate     $crtEscaped;
-        ssl_certificate_key $keyEscaped;
-        ssl_protocols       TLSv1.2 TLSv1.3;
-        ssl_ciphers         HIGH:!aNULL:!MD5;
-
-        root   $nginxRootEscaped/html;
-        index  index.html;
-
-        add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
-        add_header X-Frame-Options "SAMEORIGIN" always;
-        add_header X-Content-Type-Options "nosniff" always;
-    }
-}
-"@
-    $confContent | Set-Content $confPath -Encoding UTF8
+    $enc = New-Object System.Text.UTF8Encoding $false
+    [System.IO.File]::WriteAllText($confPath, $confNuevo, $enc)
 
     Configurar-Firewall -Puerto $Puerto -Servicio "Nginx-HTTPS"
+    Configurar-Firewall -Puerto $puertoHTTP -Servicio "Nginx-HTTP"
     Stop-Process -Name nginx -Force -ErrorAction SilentlyContinue
     Start-Sleep -Seconds 2
     Start-Process "$nginxRoot\nginx.exe" -WorkingDirectory $nginxRoot
-    Write-Host "[SSL-Nginx] HTTPS activo en puerto $Puerto." -ForegroundColor Green
+    Start-Sleep -Seconds 2
+    if (Get-Process -Name nginx -ErrorAction SilentlyContinue) {
+        Write-Host "[SSL-Nginx] HTTPS activo en puerto $Puerto. HTTP en $puertoHTTP."
+    } else {
+        Write-Host "ERROR: Nginx no pudo iniciar."
+        Get-Content "$nginxRoot\logs\error.log" -Tail 5 -ErrorAction SilentlyContinue
+    }
 }
 
 function Configurar-FTPS-IIS {
-    Write-Host "`n[FTPS] Configurando SSL en IIS-FTP..." -ForegroundColor Cyan
+    Write-Host "[FTPS] Configurando SSL en IIS-FTP..."
     Import-Module WebAdministration -ErrorAction SilentlyContinue
-
     $cert = Generar-Certificado -CertPath "C:\ssl\ftp.crt" -KeyPath "C:\ssl\ftp.key"
-    if (-not $cert) { Write-Host "ERROR: No se pudo generar certificado." -ForegroundColor Red; return }
-
-    # Aplicar certificado al sitio FTP
-    Set-ItemProperty "IIS:\Sites\FTP" `
-        -Name ftpServer.security.ssl.serverCertHash `
-        -Value $cert.Thumbprint
-
-    # Requerir SSL en canal de control y datos
-    Set-ItemProperty "IIS:\Sites\FTP" `
-        -Name ftpServer.security.ssl.controlChannelPolicy `
-        -Value 1   # SslRequire
-
-    Set-ItemProperty "IIS:\Sites\FTP" `
-        -Name ftpServer.security.ssl.dataChannelPolicy `
-        -Value 1   # SslRequire
-
-    # Abrir puerto 990 (FTPS impl?cito) en firewall
-    New-NetFirewallRule -DisplayName "FTPS-990" `
-        -Direction Inbound -LocalPort 990 -Protocol TCP `
-        -Action Allow -ErrorAction SilentlyContinue | Out-Null
-
+    if (-not $cert) { Write-Host "ERROR: No se pudo generar certificado."; return }
+    Set-ItemProperty "IIS:\Sites\FTP" -Name ftpServer.security.ssl.serverCertHash -Value $cert.Thumbprint
+    Set-ItemProperty "IIS:\Sites\FTP" -Name ftpServer.security.ssl.controlChannelPolicy -Value 1
+    Set-ItemProperty "IIS:\Sites\FTP" -Name ftpServer.security.ssl.dataChannelPolicy -Value 1
+    New-NetFirewallRule -DisplayName "FTPS-990" -Direction Inbound -LocalPort 990 -Protocol TCP -Action Allow -ErrorAction SilentlyContinue | Out-Null
     Restart-WebItem "IIS:\Sites\FTP" -ErrorAction SilentlyContinue
-    Write-Host "[FTPS] SSL activo en IIS-FTP. Thumbprint: $($cert.Thumbprint)" -ForegroundColor Green
+    Write-Host "[FTPS] SSL activo en IIS-FTP. Thumbprint: $($cert.Thumbprint)"
 }
 
 function Mostrar-Resumen-SSL {
-    Write-Host "`n============================================" -ForegroundColor Blue
-    Write-Host "   RESUMEN DE VERIFICACION SSL/TLS" -ForegroundColor Cyan
-    Write-Host "============================================" -ForegroundColor Blue
+    Write-Host ""
+    Write-Host "============================================"
+    Write-Host "   RESUMEN DE VERIFICACION SSL/TLS"
+    Write-Host "============================================"
 
-    # IIS HTTPS
     $iisBinding = Get-WebBinding -Name "Default Web Site" -Protocol "https" -ErrorAction SilentlyContinue
     if ($iisBinding) {
-        Write-Host "[OK]  IIS HTTPS activo en puerto $($iisBinding.bindingInformation.Split(':')[1])" -ForegroundColor Green
+        Write-Host "[OK]  IIS HTTPS activo en puerto $($iisBinding.bindingInformation.Split(':')[1])"
     } else {
-        Write-Host "[ERR] IIS HTTPS no configurado" -ForegroundColor Red
+        Write-Host "[ERR] IIS HTTPS no configurado"
     }
 
-    # Apache
     $apacheProc = Get-Process -Name httpd -ErrorAction SilentlyContinue
     if ($apacheProc) {
-        Write-Host "[OK]  Apache activo (PID: $($apacheProc[0].Id))" -ForegroundColor Green
+        Write-Host "[OK]  Apache activo (PID: $($apacheProc[0].Id))"
     } else {
-        Write-Host "[ERR] Apache no esta corriendo" -ForegroundColor Red
+        Write-Host "[ERR] Apache no esta corriendo"
     }
 
-    # Nginx
     $nginxProc = Get-Process -Name nginx -ErrorAction SilentlyContinue
     if ($nginxProc) {
-        Write-Host "[OK]  Nginx activo (PID: $($nginxProc[0].Id))" -ForegroundColor Green
+        Write-Host "[OK]  Nginx activo (PID: $($nginxProc[0].Id))"
     } else {
-        Write-Host "[ERR] Nginx no esta corriendo" -ForegroundColor Red
+        Write-Host "[ERR] Nginx no esta corriendo"
     }
 
-    # IIS-FTP SSL
     try {
         $ftpSSL = Get-ItemProperty "IIS:\Sites\FTP" -Name ftpServer.security.ssl.controlChannelPolicy -ErrorAction SilentlyContinue
         if ($ftpSSL -eq 1) {
-            Write-Host "[OK]  IIS-FTP SSL (FTPS) activo" -ForegroundColor Green
+            Write-Host "[OK]  IIS-FTP SSL (FTPS) activo"
         } else {
-            Write-Host "[ERR] IIS-FTP sin SSL" -ForegroundColor Red
+            Write-Host "[ERR] IIS-FTP sin SSL"
         }
     } catch {
-        Write-Host "[ERR] IIS-FTP no encontrado" -ForegroundColor Red
+        Write-Host "[ERR] IIS-FTP no encontrado"
     }
 
-    # Certificados en el store
-    Write-Host "`n--- Certificados en LocalMachine\My ---" -ForegroundColor Yellow
+    Write-Host ""
+    Write-Host "--- Certificados en LocalMachine\My ---"
     Get-ChildItem "Cert:\LocalMachine\My" | Where-Object { $_.Subject -like "*reprobados*" } |
         ForEach-Object {
-            Write-Host "[OK]  CN=$($_.Subject) | Expira: $($_.NotAfter)" -ForegroundColor Green
+            Write-Host "[OK]  CN=$($_.Subject) | Expira: $($_.NotAfter)"
         }
 
-    # Puertos activos
-    Write-Host "`n--- Puertos SSL activos ---" -ForegroundColor Yellow
+    Write-Host ""
+    Write-Host "--- Puertos SSL activos ---"
     Get-NetTCPConnection -State Listen |
-        Where-Object { $_.LocalPort -in @(443, 8443, 990, 80, 8080, 21) } |
+        Where-Object { $_.LocalPort -in @(443, 8443, 990, 80, 8080, 8085, 21) } |
         Sort-Object LocalPort |
         ForEach-Object {
             $proc = (Get-Process -Id $_.OwningProcess -ErrorAction SilentlyContinue).Name
-            Write-Host "  Puerto $($_.LocalPort) -- $proc" -ForegroundColor Cyan
+            Write-Host "  Puerto $($_.LocalPort) - $proc"
         }
 
     Pause
