@@ -4,97 +4,77 @@ verificar_instalacion -pak "GPMC"
 Import-Module ActiveDirectory
 Import-Module GroupPolicy
 
+# --- CONFIGURACION ---
 $dominio = "DC=practica,DC=local"
-$dominioFQDN = "practica.local"
-$gpoName = "Forzar-Cierre-Sesion"
+$gpoName = "Politicas-Acceso-FIM"
 
-function Crear-GPO-Logoff {
+function Configurar-Todo {
+    # 1. Crear GPO si no existe
     if (-not (Get-GPO -Name $gpoName -ErrorAction SilentlyContinue)) {
         New-GPO -Name $gpoName | Out-Null
-        Write-Host "GPO creada: $gpoName"
-    } else {
-        Write-Host "GPO ya existe: $gpoName"
+        Write-Host "[+] GPO creada" -ForegroundColor Green
     }
 
+    # 2. CIERRE DE SESION FORZADO (System ForceLogoff)
     Set-GPRegistryValue -Name $gpoName `
-        -Key "HKLM\SYSTEM\CurrentControlSet\Services\LanManServer\Parameters" `
-        -ValueName "EnableForcedLogOff" `
-        -Type DWord `
-        -Value 1
+        -Key "HKLM\Software\Microsoft\Windows\CurrentVersion\Policies\System" `
+        -ValueName "ForceLogoff" -Type DWord -Value 1
 
-    Write-Host "Configuracion de cierre forzado aplicada."
+    # 3. BLOQUEO NOTEPAD (DisallowRun para Win10 Pro)
+    Set-GPRegistryValue -Name $gpoName `
+        -Key "HKCU\Software\Microsoft\Windows\CurrentVersion\Policies\Explorer" `
+        -ValueName "DisallowRun" -Type DWord -Value 1
+        
+    Set-GPRegistryValue -Name $gpoName `
+        -Key "HKCU\Software\Microsoft\Windows\CurrentVersion\Policies\Explorer\DisallowRun" `
+        -ValueName "1" -Type String -Value "notepad.exe"
 
+    Write-Host "[+] Registro configurado en GPO" -ForegroundColor Cyan
+
+    # 4. VINCULACION FORZADA
     foreach ($uo in @("Cuates", "NoCuates")) {
+        $pathOU = "OU=$uo,$dominio"
         try {
-            New-GPLink -Name $gpoName -Target "OU=$uo,$dominio" -ErrorAction Stop | Out-Null
-            Write-Host "GPO vinculada a OU: $uo"
+            New-GPLink -Name $gpoName -Target $pathOU -Enforced Yes -ErrorAction Stop | Out-Null
+            Write-Host "[+] Vinculo forzado en OU: $uo" -ForegroundColor Green
         } catch {
-            Write-Host "GPO ya estaba vinculada a: $uo"
+            Set-GPLink -Name $gpoName -Target $pathOU -Enforced Yes | Out-Null
+            Write-Host "[!] Vinculo ya existia en: $uo" -ForegroundColor Yellow
         }
     }
-
-    Write-Host "GPO configurada correctamente."
 }
 
-function Ver-GPO {
-    Write-Host ""
+function Ver-Estado-Actual {
     $gpo = Get-GPO -Name $gpoName -ErrorAction SilentlyContinue
     if ($gpo) {
-        Write-Host "Nombre    : $($gpo.DisplayName)"
-        Write-Host "Estado    : $($gpo.GpoStatus)"
-        Write-Host "Creada    : $($gpo.CreationTime)"
-        Write-Host "Modificada: $($gpo.ModificationTime)"
-        Write-Host ""
-        Write-Host "Links:"
+        Write-Host "--- Estado de GPO ---"
         foreach ($uo in @("Cuates", "NoCuates")) {
             $link = Get-GPInheritance -Target "OU=$uo,$dominio" | 
-                Select-Object -ExpandProperty GpoLinks | 
-                Where-Object { $_.DisplayName -eq $gpoName }
-            if ($link) {
-                Write-Host "  OU=$uo -> Vinculada"
-            } else {
-                Write-Host "  OU=$uo -> No vinculada"
-            }
+                    Select-Object -ExpandProperty GpoLinks | 
+                    Where-Object { $_.DisplayName -eq $gpoName }
+            $status = if ($link) { "OK" } else { "ERROR" }
+            Write-Host "OU: $uo -> $status"
         }
     } else {
-        Write-Host "La GPO '$gpoName' no existe todavia."
+        Write-Host "La GPO no existe" -ForegroundColor Red
     }
 }
 
-function Forzar-Actualizacion {
-    Invoke-GPUpdate -Force
-    Write-Host "GPUpdate forzado correctamente."
-}
-
-function Show-Menu-GPO {
-    Clear-Host
-    Write-Host "============================================================"
-    Write-Host "        GPO - CIERRE DE SESION FORZADO"
-    Write-Host "============================================================"
-    Write-Host ""
-    Write-Host "  [1]  Crear y vincular GPO de cierre forzado"
-    Write-Host "  [2]  Ver estado de la GPO"
-    Write-Host "  [3]  Forzar actualizacion de politicas (gpupdate)"
-    Write-Host "  [0]  Volver al menu principal"
-    Write-Host ""
-    Write-Host "============================================================"
-}
-
+# --- MENU PRINCIPAL ---
 do {
-    Show-Menu-GPO
-    $op = Read-Host "Selecciona una opcion"
+    Clear-Host
+    Write-Host "============================="
+    Write-Host "   CONTROL DE ACCESO GPO"
+    Write-Host "============================="
+    Write-Host "[1] Aplicar Politicas"
+    Write-Host "[2] Ver Estado"
+    Write-Host "[0] Salir"
+    $op = Read-Host "Opcion"
 
     switch ($op) {
-        "1" { Crear-GPO-Logoff }
-        "2" { Ver-GPO }
-        "3" { Forzar-Actualizacion }
-        "0" { Write-Host "Volviendo al menu principal..." }
-        default { Write-Host "Opcion invalida." }
+        "1" { Configurar-Todo }
+        "2" { Ver-Estado-Actual }
+        "0" { Write-Host "Saliendo..." }
     }
-
-    if ($op -ne "0") {
-        Write-Host ""
-        Read-Host "Presiona ENTER para continuar"
-    }
-
+    if ($op -ne "0") { Read-Host "Presione Enter" }
 } while ($op -ne "0")

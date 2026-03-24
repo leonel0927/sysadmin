@@ -5,6 +5,9 @@ Import-Module ActiveDirectory
 $dominio = "DC=practica,DC=local"
 $dominioFQDN = "practica.local"
 $csvPath = "Z:\windows\usuarios.csv"
+$rutaBase = "C:\Perfiles"
+$servidor = "192.168.117.11"
+$shareName = "Perfiles"
 
 function Crear-UOsYGrupos {
     foreach ($uo in @("Cuates", "NoCuates")) {
@@ -17,6 +20,20 @@ function Crear-UOsYGrupos {
             New-ADGroup -Name $uo -GroupScope Global -GroupCategory Security -Path $ouPath
             Write-Host "Grupo creado: $uo"
         }
+    }
+}
+
+function Configurar-Compartido {
+    if (-not (Test-Path $rutaBase)) {
+        New-Item -ItemType Directory -Path $rutaBase | Out-Null
+        Write-Host "Carpeta base creada: $rutaBase"
+    }
+
+    if (-not (Get-SmbShare -Name $shareName -ErrorAction SilentlyContinue)) {
+        New-SmbShare -Name $shareName -Path $rutaBase -FullAccess "PRACTICA\Administrador" -ChangeAccess "PRACTICA\Usuarios del dominio"
+        Write-Host "Carpeta compartida creada: \\$servidor\$shareName"
+    } else {
+        Write-Host "Carpeta compartida ya existe: \\$servidor\$shareName"
     }
 }
 
@@ -45,6 +62,17 @@ function Crear-Usuario {
 
     $ouDest = "OU=$Departamento,$dominio"
     $pass = ConvertTo-SecureString $Contrasena -AsPlainText -Force
+    $rutaUsuario = "$rutaBase\$Usuario"
+    $rutaRed = "\\$servidor\$shareName\$Usuario"
+
+    if (-not (Test-Path $rutaUsuario)) {
+        New-Item -ItemType Directory -Path $rutaUsuario | Out-Null
+    }
+
+    $acl = Get-Acl $rutaUsuario
+    $regla = New-Object System.Security.AccessControl.FileSystemAccessRule("PRACTICA\$Usuario", "FullControl", "ContainerInherit,ObjectInherit", "None", "Allow")
+    $acl.SetAccessRule($regla)
+    Set-Acl $rutaUsuario $acl
 
     try {
         New-ADUser `
@@ -57,10 +85,12 @@ function Crear-Usuario {
             -Enabled $true `
             -Path $ouDest `
             -Department $Departamento `
-            -PasswordNeverExpires $true
+            -PasswordNeverExpires $true `
+            -HomeDirectory $rutaRed `
+            -HomeDrive "H:"
 
         Add-ADGroupMember -Identity $Departamento -Members $Usuario
-        Write-Host "Usuario creado: $Usuario -> $Departamento"
+        Write-Host "Usuario creado: $Usuario -> $Departamento | Home: $rutaRed"
     } catch {
         Write-Host "Error al crear $Usuario : $_"
     }
@@ -92,6 +122,27 @@ function Agregar-Usuario-Manual {
     Crear-Usuario -Nombre $nombre -Usuario $usuario -Departamento $depto -Contrasena $contrasena
 }
 
+function Asignar-HomeFolders-Existentes {
+    $usuarios = Import-Csv -Path $csvPath -Encoding UTF8
+    foreach ($u in $usuarios) {
+        $rutaRed = "\\$servidor\$shareName\$($u.Usuario)"
+        $rutaUsuario = "$rutaBase\$($u.Usuario)"
+
+        if (-not (Test-Path $rutaUsuario)) {
+            New-Item -ItemType Directory -Path $rutaUsuario | Out-Null
+        }
+
+        $acl = Get-Acl $rutaUsuario
+        $regla = New-Object System.Security.AccessControl.FileSystemAccessRule("PRACTICA\$($u.Usuario)", "FullControl", "ContainerInherit,ObjectInherit", "None", "Allow")
+        $acl.SetAccessRule($regla)
+        Set-Acl $rutaUsuario $acl
+
+        Set-ADUser -Identity $u.Usuario -HomeDirectory $rutaRed -HomeDrive "H:"
+        Write-Host "Home folder asignado a: $($u.Usuario) -> $rutaRed"
+    }
+    Write-Host "Home folders asignados correctamente."
+}
+
 function Show-Menu-Usuarios {
     Clear-Host
     Write-Host "============================================================"
@@ -101,6 +152,8 @@ function Show-Menu-Usuarios {
     Write-Host "  [1]  Importar usuarios desde CSV"
     Write-Host "  [2]  Agregar usuario manualmente"
     Write-Host "  [3]  Listar usuarios existentes"
+    Write-Host "  [4]  Configurar carpeta compartida Perfiles"
+    Write-Host "  [5]  Asignar Home Folders a usuarios existentes"
     Write-Host "  [0]  Volver al menu principal"
     Write-Host ""
     Write-Host "============================================================"
@@ -117,11 +170,13 @@ do {
         "2" { Agregar-Usuario-Manual }
         "3" {
             Write-Host ""
-            Get-ADUser -Filter * -Properties Department |
+            Get-ADUser -Filter * -Properties Department, HomeDirectory |
                 Where-Object { $_.Department -in @("Cuates", "NoCuates") } |
-                Select-Object SamAccountName, Name, Department |
+                Select-Object SamAccountName, Name, Department, HomeDirectory |
                 Format-Table -AutoSize
         }
+        "4" { Configurar-Compartido }
+        "5" { Asignar-HomeFolders-Existentes }
         "0" { Write-Host "Volviendo al menu principal..." }
         default { Write-Host "Opcion invalida." }
     }
