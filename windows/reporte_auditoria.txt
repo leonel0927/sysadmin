@@ -1,0 +1,74 @@
+﻿REPORTE DE ACCESOS DENEGADOS
+Generado: 04/20/2026 13:46:43
+Total eventos: 10
+============================================================
+
+Fecha     : 04/19/2026 16:59:34
+Usuario   : user06@practica.local@
+IP origen : -
+Razon     : %%2313
+Estado    : 0xc000006d
+----------------------------------------
+
+Fecha     : 04/19/2026 16:58:38
+Usuario   : user06@practica.local@
+IP origen : -
+Razon     : %%2313
+Estado    : 0xc000006d
+----------------------------------------
+
+Fecha     : 04/19/2026 16:57:27
+Usuario   : user06@practica.local@
+IP origen : -
+Razon     : %%2313
+Estado    : 0xc000006d
+----------------------------------------
+
+Fecha     : 04/19/2026 16:57:09
+Usuario   : user06@practica.local@
+IP origen : -
+Razon     : %%2313
+Estado    : 0xc000006d
+----------------------------------------
+
+Fecha     : 04/19/2026 16:55:57
+Usuario   : user01@practica.local@
+IP origen : -
+Razon     : %%2311
+Estado    : 0xc000006e
+----------------------------------------
+
+Fecha     : 04/19/2026 16:55:39
+Usuario   : user01@practica.local@
+IP origen : -
+Razon     : %%2311
+Estado    : 0xc000006e
+----------------------------------------
+
+Fecha     : 04/19/2026 12:42:33
+Usuario   : user06@practica.local@
+IP origen : -
+Razon     : %%2313
+Estado    : 0xc000006d
+----------------------------------------
+
+Fecha     : 04/19/2026 12:40:53
+Usuario   : user01@practica.local@
+IP origen : -
+Razon     : %%2311
+Estado    : 0xc000006e
+----------------------------------------
+
+Fecha     : 04/19/2026 12:40:09
+Usuario   : user01@practica.local@
+IP origen : -
+Razon     : %%2311
+Estado    : 0xc000006e
+----------------------------------------
+
+Fecha     : 04/19/2026 12:20:42
+Usuario   : admin_politicas@practica.local@
+IP origen : -
+Razon     : %%2313
+Estado    : 0xc000006d
+----------------------------------------
