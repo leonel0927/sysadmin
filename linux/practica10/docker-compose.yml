@@ -1,0 +1,79 @@
+services:
+  web_server:
+    build:
+      context: ./web
+      dockerfile: Dockerfile
+    container_name: web_server
+    hostname: web_server
+    networks:
+      infra_red:
+        ipv4_address: 172.20.0.10
+    ports:
+      - "8080:80"
+    volumes:
+      - web_content:/var/www/html
+      - ftp_uploads:/var/www/html/uploads:ro
+    mem_limit: 512m
+    memswap_limit: 512m
+    cpus: "0.5"
+    depends_on: [postgres_db]
+    restart: unless-stopped
+
+  postgres_db:
+    image: postgres:16-alpine
+    container_name: postgres_db
+    hostname: postgres_db
+    networks:
+      infra_red:
+        ipv4_address: 172.20.0.20
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB:       practica10_db
+      POSTGRES_USER:     practica10
+      POSTGRES_PASSWORD: Practica10Pass!
+    volumes:
+      - db_data:/var/lib/postgresql/data
+      - ./postgres/init_db.sql:/docker-entrypoint-initdb.d/init_db.sql:ro
+      - ./postgres/backups:/backups
+    mem_limit: 512m
+    memswap_limit: 512m
+    cpus: "0.5"
+    restart: unless-stopped
+
+  ftp_server:
+    build:
+      context: ./ftp
+      dockerfile: Dockerfile
+    container_name: ftp_server
+    hostname: ftp_server
+    networks:
+      infra_red:
+        ipv4_address: 172.20.0.30
+    ports:
+      - "21:21"
+      - "21100-21110:21100-21110"
+    environment:
+      FTP_USER: ftpadmin
+      FTP_PASS: FtpPass2024!
+    volumes:
+      - ftp_uploads:/ftp/uploads
+    mem_limit: 256m
+    memswap_limit: 256m
+    cpus: "0.25"
+    restart: unless-stopped
+
+volumes:
+  db_data:     { name: db_data,     driver: local }
+  web_content: { name: web_content, driver: local }
+  ftp_uploads: { name: ftp_uploads, driver: local }
+
+networks:
+  infra_red:
+    name: infra_red
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.20.0.0/16
+          gateway: 172.20.0.1

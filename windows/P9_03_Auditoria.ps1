@@ -23,45 +23,50 @@ function Ver-Auditoria {
 }
 
 function Generar-Reporte {
-    Write-Host "Extrayendo ultimos 10 eventos de acceso denegado (ID 4625)..."
+    Write-Host "Extrayendo ultimos 10 eventos de acceso denegado (ID 4625)..." -ForegroundColor Cyan
 
-    $eventos = Get-WinEvent -FilterHashtable @{
-        LogName   = "Security"
-        Id        = 4625
-    } -MaxEvents 10 -ErrorAction SilentlyContinue
+    # Extraer los eventos en XML para saltar el bloqueo de permisos de PowerShell
+    $rawXml = wevtutil qe Security "/q:*[System [(EventID=4625)]]" /f:xml /c:10
 
-    if (-not $eventos) {
-        Write-Host "No se encontraron eventos de acceso denegado."
+    if (-not $rawXml) {
+        Write-Host "No se encontraron eventos de acceso denegado." -ForegroundColor Yellow
         return
     }
 
+    # Convertir a objetos XML de PowerShell
+    [xml[]]$eventos = $rawXml
+
     $lineas = @()
     $lineas += "REPORTE DE ACCESOS DENEGADOS"
-    $lineas += "Generado: $(Get-Date)"
+    $lineas += "Generado: $(Get-Date -Format 'MM/dd/yyyy HH:mm:ss')"
     $lineas += "Total eventos: $($eventos.Count)"
     $lineas += "=" * 60
 
     foreach ($e in $eventos) {
-        $xml = [xml]$e.ToXml()
-        $data = $xml.Event.EventData.Data
+        $data = $e.Event.EventData.Data
+        $system = $e.Event.System
 
+        # Extraer valores exactos del XML
         $usuario = ($data | Where-Object { $_.Name -eq "TargetUserName" })."#text"
         $dominio = ($data | Where-Object { $_.Name -eq "TargetDomainName" })."#text"
         $ip      = ($data | Where-Object { $_.Name -eq "IpAddress" })."#text"
         $razon   = ($data | Where-Object { $_.Name -eq "FailureReason" })."#text"
         $estado  = ($data | Where-Object { $_.Name -eq "Status" })."#text"
+        $fecha   = $system.TimeCreated.SystemTime
 
+        # Construir el bloque según tu ejemplo
         $lineas += ""
-        $lineas += "Fecha     : $($e.TimeCreated)"
-        $lineas += "Usuario   : $usuario@$dominio"
+        $lineas += "Fecha     : $fecha"
+        $lineas += "Usuario   : $usuario@$dominio@"
         $lineas += "IP origen : $ip"
         $lineas += "Razon     : $razon"
         $lineas += "Estado    : $estado"
         $lineas += "-" * 40
     }
 
+    # Guardar en el archivo de reporte definido en tu script
     $lineas | Out-File -FilePath $reportePath -Encoding UTF8
-    Write-Host "Reporte generado en: $reportePath"
+    Write-Host "Reporte generado en: $reportePath" -ForegroundColor Green
 }
 
 function Ver-Reporte {
