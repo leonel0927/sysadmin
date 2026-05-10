@@ -27,7 +27,7 @@ services:
       infra_red:
         ipv4_address: 172.20.0.20
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
     environment:
       POSTGRES_DB:       practica10_db
       POSTGRES_USER:     practica10

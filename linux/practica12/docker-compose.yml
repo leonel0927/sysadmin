@@ -1,0 +1,93 @@
+services:
+
+  # ── Servidor de correo (Postfix + Dovecot + Rspamd + Fail2ban) ─
+  mailserver:
+    image: docker.io/mailserver/docker-mailserver:latest
+    container_name: mailserver
+    hostname: mail.reprobados.com
+    domainname: reprobados.com
+    env_file: .env.mailserver
+    ports:
+      - "25:25"
+      - "143:143"
+      - "587:587"
+      - "993:993"
+    volumes:
+      - mail_data:/var/mail
+      - mail_state:/var/mail-state
+      - mail_log:/var/log/mail
+      - ./config:/tmp/docker-mailserver
+      - ./certs:/etc/letsencrypt/live/mail.reprobados.com:ro
+    networks:
+      - mail_net
+    restart: always
+    stop_grace_period: 1m
+    cap_add:
+      - NET_ADMIN
+    healthcheck:
+      test: ["CMD", "ss", "-lntp", "|", "grep", ":25"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  # ── Base de datos para Roundcube ─────────────────────────────
+  mariadb_mail:
+    image: mariadb:10.11
+    container_name: mariadb_mail
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE:      ${MYSQL_DATABASE}
+      MYSQL_USER:          ${MYSQL_USER}
+      MYSQL_PASSWORD:      ${MYSQL_PASSWORD}
+    volumes:
+      - roundcube_db:/var/lib/mysql
+    networks:
+      - mail_net
+    restart: always
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+  # ── Webmail Roundcube ─────────────────────────────────────────
+  roundcube:
+    image: roundcube/roundcubemail:latest
+    container_name: roundcube
+    environment:
+      ROUNDCUBEMAIL_DEFAULT_HOST:    ssl://mailserver
+      ROUNDCUBEMAIL_DEFAULT_PORT:    993
+      ROUNDCUBEMAIL_SMTP_SERVER:     tls://mailserver
+      ROUNDCUBEMAIL_SMTP_PORT:       587
+      ROUNDCUBEMAIL_DB_TYPE:         mysql
+      ROUNDCUBEMAIL_DB_HOST:         mariadb_mail
+      ROUNDCUBEMAIL_DB_NAME:         ${MYSQL_DATABASE}
+      ROUNDCUBEMAIL_DB_USER:         ${MYSQL_USER}
+      ROUNDCUBEMAIL_DB_PASSWORD:     ${MYSQL_PASSWORD}
+      ROUNDCUBEMAIL_DES_KEY:         ${ROUNDCUBE_DES_KEY}
+      ROUNDCUBEMAIL_SKIN:            elastic
+      ROUNDCUBEMAIL_DEFAULT_DOMAIN:  reprobados.com
+      ROUNDCUBEMAIL_SESSION_LIFETIME: 30
+    ports:
+      - "8091:80"
+    volumes:
+      - roundcube_data:/var/roundcube/db
+      - ./roundcube/config.inc.php:/var/roundcube/config/config.inc.php:ro
+    networks:
+      - mail_net
+    depends_on:
+      mariadb_mail:
+        condition: service_healthy
+    restart: always
+
+volumes:
+  mail_data:      { name: mail_data,      driver: local }
+  mail_state:     { name: mail_state,     driver: local }
+  mail_log:       { name: mail_log,       driver: local }
+  roundcube_db:   { name: roundcube_db,   driver: local }
+  roundcube_data: { name: roundcube_data, driver: local }
+
+networks:
+  mail_net:
+    name: mail_net
+    driver: bridge

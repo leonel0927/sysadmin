@@ -81,75 +81,11 @@ gen_web_html() {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width,initial-scale=1.0">
-  <title>Practica 10 - Contenedores Docker</title>
+  <title>Practica 10</title>
   <link rel="stylesheet" href="/css/styles.css">
 </head>
 <body>
-  <div class="scanline"></div>
-  <header>
-    <div class="hdr">
-      <div class="logo"><span class="ico">⬡</span>
-        <div><p class="sub">SysAdmin Lab · Ubuntu Server</p><h1>PRÁCTICA 10</h1></div>
-      </div>
-      <nav>
-        <span class="pill g">● Apache/Alpine</span>
-        <span class="pill b">● PostgreSQL</span>
-        <span class="pill o">● FTP</span>
-      </nav>
-    </div>
-  </header>
-  <main>
-    <section class="hero">
-      <div class="hbg"></div>
-      <div class="hc">
-        <p class="tag">Ubuntu Server — Docker Engine</p>
-        <h2>Migración a<br><em>Contenedores</em></h2>
-        <p>Infraestructura con contenedores personalizados.<br>
-           Enfoque en <strong>seguridad</strong> y <strong>almacenamiento persistente</strong>.</p>
-      </div>
-    </section>
-    <section class="sec">
-      <h3><span>01</span> Servicios</h3>
-      <div class="cards">
-        <div class="card cw"><div class="ci">🌐</div><h4>Servidor Web</h4>
-          <p>Apache sobre Alpine. ServerTokens desactivados, usuario no-root.</p>
-          <span class="ct">Puerto 8080</span></div>
-        <div class="card cd"><div class="ci">🗄️</div><h4>Base de Datos</h4>
-          <p>PostgreSQL con volumen <code>db_data</code> y respaldos automatizados.</p>
-          <span class="ct">Puerto 5432</span></div>
-        <div class="card cf"><div class="ci">📁</div><h4>Servidor FTP</h4>
-          <p>vsftpd con volumen <code>ftp_uploads</code> compartido con el web.</p>
-          <span class="ct">Puerto 21</span></div>
-      </div>
-    </section>
-    <section class="sec">
-      <h3><span>02</span> Red infra_red</h3>
-      <div class="net">
-        <div class="nn nw">web_server<br><small>172.20.0.10</small></div>
-        <div class="nl"></div>
-        <div class="nh">infra_red<br><small>172.20.0.0/16</small></div>
-        <div class="nl"></div>
-        <div class="nn nd">postgres_db<br><small>172.20.0.20</small></div>
-        <div class="nl nv"></div>
-        <div class="nn nf">ftp_server<br><small>172.20.0.30</small></div>
-      </div>
-    </section>
-    <section class="sec">
-      <h3><span>03</span> Archivos FTP</h3>
-      <p style="color:var(--tm);margin-bottom:16px">Archivos subidos via FTP al volumen compartido:</p>
-      <a href="/uploads" class="btn">Ver directorio /uploads →</a>
-    </section>
-    <section class="sec">
-      <h3><span>04</span> Límites de Recursos</h3>
-      <div class="rg">
-        <div class="ri"><p class="rl">Memoria RAM</p>
-          <div class="rb"><div class="rf"></div></div><p>Límite: 512 MB</p></div>
-        <div class="ri"><p class="rl">CPU</p>
-          <div class="rb"><div class="rf rfc"></div></div><p>Límite: 0.5 CPUs</p></div>
-      </div>
-    </section>
-  </main>
-  <footer><p>Practica 10 — Docker — Ubuntu Server</p></footer>
+    <h1>si jala</h1>
 </body>
 </html>
 HTML
